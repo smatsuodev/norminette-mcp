@@ -248,55 +248,12 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
   const originalContent = content;
   const fixes: string[] = [];
 
-  // SPC_BEFORE_NL: Remove trailing spaces
-  const trailingSpaceFixed = fixTrailingSpaces(content);
-  if (trailingSpaceFixed !== content) {
-    content = trailingSpaceFixed;
-    fixes.push("SPC_BEFORE_NL: Removed trailing spaces");
+  // Apply comprehensive whitespace fixes that preserve comments
+  const fixedContent = fixAllWhitespaceIssues(content);
+  if (fixedContent !== content) {
+    content = fixedContent;
+    fixes.push("Fixed whitespace issues while preserving comments");
   }
-
-  // SPACE_EMPTY_LINE: Remove spaces on empty lines
-  const emptyLineSpaceFixed = fixSpaceOnEmptyLines(content);
-  if (emptyLineSpaceFixed !== content) {
-    content = emptyLineSpaceFixed;
-    fixes.push("SPACE_EMPTY_LINE: Removed spaces on empty lines");
-  }
-
-  // SPC_INSTEAD_TAB: Convert leading spaces to tabs
-  const leadingSpacesFixed = fixLeadingSpaces(content);
-  if (leadingSpacesFixed !== content) {
-    content = leadingSpacesFixed;
-    fixes.push("SPC_INSTEAD_TAB: Converted leading spaces to tabs");
-  }
-
-  // TAB_INSTEAD_SPC: Convert tabs to spaces where needed (not at line start)
-  const tabsToSpacesFixed = fixTabsToSpaces(content);
-  if (tabsToSpacesFixed !== content) {
-    content = tabsToSpacesFixed;
-    fixes.push("TAB_INSTEAD_SPC: Converted tabs to spaces where needed");
-  }
-
-  // CONSECUTIVE_SPC: Fix consecutive spaces
-  const consecutiveSpacesFixed = fixConsecutiveSpaces(content);
-  if (consecutiveSpacesFixed !== content) {
-    content = consecutiveSpacesFixed;
-    fixes.push("CONSECUTIVE_SPC: Fixed consecutive spaces");
-  }
-
-  // CONSECUTIVE_WS: Fix consecutive whitespaces
-  const consecutiveWhitespaceFixed = fixConsecutiveWhitespace(content);
-  if (consecutiveWhitespaceFixed !== content) {
-    content = consecutiveWhitespaceFixed;
-    fixes.push("CONSECUTIVE_WS: Fixed consecutive whitespace");
-  }
-
-  // MIXED_SPACE_TAB: Fix mixed spaces and tabs
-  const mixedSpaceTabFixed = fixMixedSpacesAndTabs(content);
-  if (mixedSpaceTabFixed !== content) {
-    content = mixedSpaceTabFixed;
-    fixes.push("MIXED_SPACE_TAB: Fixed mixed spaces and tabs");
-  }
-
 
   if (content !== originalContent) {
     fs.writeFileSync(filePath, content);
@@ -305,6 +262,153 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
       fixes: fixes
     });
   }
+}
+
+// Comprehensive whitespace fix function that handles multi-line comments correctly
+function fixAllWhitespaceIssues(content: string): string {
+  // First, identify and mark all comment and string regions
+  const segments = parseCodeSegments(content);
+  
+  let result = '';
+  
+  for (const segment of segments) {
+    if (segment.type === 'comment' || segment.type === 'string') {
+      // Preserve comments and strings exactly as they are
+      result += segment.content;
+    } else {
+      // Apply fixes to code segments
+      result += fixCodeSegment(segment.content);
+    }
+  }
+  
+  return result;
+}
+
+interface CodeSegment {
+  type: 'code' | 'comment' | 'string';
+  content: string;
+}
+
+function parseCodeSegments(content: string): CodeSegment[] {
+  const segments: CodeSegment[] = [];
+  let i = 0;
+  
+  while (i < content.length) {
+    // Check for line comment
+    if (i < content.length - 1 && content[i] === '/' && content[i + 1] === '/') {
+      const start = i;
+      // Find end of line
+      while (i < content.length && content[i] !== '\n') {
+        i++;
+      }
+      if (i < content.length) i++; // Include the newline
+      segments.push({ type: 'comment', content: content.substring(start, i) });
+      continue;
+    }
+    
+    // Check for block comment
+    if (i < content.length - 1 && content[i] === '/' && content[i + 1] === '*') {
+      const start = i;
+      i += 2;
+      // Find end of block comment
+      while (i < content.length - 1) {
+        if (content[i] === '*' && content[i + 1] === '/') {
+          i += 2;
+          break;
+        }
+        i++;
+      }
+      // If we didn't find closing */, include rest of content
+      if (i >= content.length - 1 && !(content[i - 1] === '/' && content[i - 2] === '*')) {
+        i = content.length;
+      }
+      segments.push({ type: 'comment', content: content.substring(start, i) });
+      continue;
+    }
+    
+    // Check for string literal
+    if (content[i] === '"' || content[i] === "'") {
+      const quote = content[i];
+      const start = i;
+      i++;
+      
+      // Find end of string, handling escape sequences
+      while (i < content.length) {
+        if (content[i] === '\\') {
+          i += 2; // Skip escaped character
+          continue;
+        }
+        if (content[i] === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      segments.push({ type: 'string', content: content.substring(start, i) });
+      continue;
+    }
+    
+    // Regular code - find next special character
+    const start = i;
+    while (i < content.length) {
+      if ((i < content.length - 1 && content[i] === '/' && (content[i + 1] === '/' || content[i + 1] === '*')) ||
+          content[i] === '"' || content[i] === "'") {
+        break;
+      }
+      i++;
+    }
+    
+    if (i > start) {
+      segments.push({ type: 'code', content: content.substring(start, i) });
+    }
+  }
+  
+  return segments;
+}
+
+function fixCodeSegment(content: string): string {
+  const lines = content.split('\n');
+  
+  return lines.map(line => {
+    // Remove trailing spaces and tabs
+    line = line.replace(/[ \t]+$/, '');
+    
+    // Handle empty lines (remove any whitespace)
+    if (line.trim() === '') {
+      return '';
+    }
+    
+    // Convert leading spaces to tabs (4 spaces = 1 tab)
+    const leadingWhitespace = line.match(/^[ \t]*/);
+    if (leadingWhitespace) {
+      const leading = leadingWhitespace[0];
+      let leadingPart = '';
+      
+      // Convert mixed/space indentation to tabs
+      if (leading.length > 0) {
+        const totalSpaces = leading.split('').reduce((count, char) => {
+          return count + (char === '\t' ? 4 : 1);
+        }, 0);
+        const tabCount = Math.floor(totalSpaces / 4);
+        const remainingSpaces = totalSpaces % 4;
+        leadingPart = '\t'.repeat(tabCount) + ' '.repeat(remainingSpaces);
+      }
+      
+      // Get the non-leading part
+      let restPart = line.substring(leading.length);
+      
+      // Only convert tabs to spaces around operators and punctuation, not before identifiers
+      // Keep tabs between types/keywords and identifiers
+      restPart = restPart.replace(/\t(?=[ \t]*[+\-*/%=<>!&|,;(){}\[\]."])/g, ' ');
+      
+      // Fix consecutive spaces (2 or more spaces become 1 space), but preserve single tabs
+      restPart = restPart.replace(/  +/g, ' ');
+      
+      return leadingPart + restPart;
+    }
+    
+    return line;
+  }).join('\n');
 }
 
 // SPC_BEFORE_NL: Remove trailing spaces
@@ -346,11 +450,17 @@ function fixTabsToSpaces(content: string): string {
     const leadingWhitespace = line.match(/^[\t ]*/);
     const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
     
-    // Replace tabs with spaces in the non-leading part
+    // Process the non-leading part while preserving comments and strings
     const leadingPart = line.substring(0, leadingLength);
-    const restPart = line.substring(leadingLength).replace(/\t/g, ' ');
+    const restPart = line.substring(leadingLength);
     
-    return leadingPart + restPart;
+    // Use helper function to preserve whitespace in comments and strings
+    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
+      // Convert all tabs to spaces in non-leading positions (except in comments/strings)
+      return segment.replace(/\t/g, ' ');
+    });
+    
+    return leadingPart + transformedRest;
   }).join('\n');
 }
 
@@ -365,14 +475,17 @@ function fixConsecutiveSpaces(content: string): string {
     const leadingWhitespace = line.match(/^[\t ]*/);
     const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
     
-    // Fix consecutive spaces in the non-leading part
+    // Fix consecutive spaces in the non-leading part while preserving comments
     const leadingPart = line.substring(0, leadingLength);
-    let restPart = line.substring(leadingLength);
+    const restPart = line.substring(leadingLength);
     
-    // Replace consecutive spaces with single space
-    restPart = restPart.replace(/ {2,}/g, ' ');
+    // Use helper function to preserve whitespace in comments and strings
+    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
+      // Replace consecutive spaces with single space
+      return segment.replace(/ {2,}/g, ' ');
+    });
     
-    return leadingPart + restPart;
+    return leadingPart + transformedRest;
   }).join('\n');
 }
 
@@ -387,18 +500,23 @@ function fixConsecutiveWhitespace(content: string): string {
     const leadingWhitespace = line.match(/^[\t ]*/);
     const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
     
-    // Fix consecutive whitespace in the non-leading part
+    // Fix consecutive whitespace in the non-leading part while preserving comments
     const leadingPart = line.substring(0, leadingLength);
-    const restPart = line.substring(leadingLength).replace(/[ \t]{2,}/g, match => {
-      // If it's all spaces, reduce to one space
-      if (match.match(/^ +$/)) return ' ';
-      // If it's all tabs, reduce to one tab
-      if (match.match(/^\t+$/)) return '\t';
-      // If mixed, convert to single space
-      return ' ';
+    const restPart = line.substring(leadingLength);
+    
+    // Use helper function to preserve whitespace in comments and strings
+    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
+      return segment.replace(/[ \t]{2,}/g, match => {
+        // If it's all spaces, reduce to one space
+        if (match.match(/^ +$/)) return ' ';
+        // If it's all tabs, reduce to one tab
+        if (match.match(/^\t+$/)) return '\t';
+        // If mixed, convert to single space
+        return ' ';
+      });
     });
     
-    return leadingPart + restPart;
+    return leadingPart + transformedRest;
   }).join('\n');
 }
 
@@ -435,13 +553,97 @@ function fixMixedSpacesAndTabs(content: string): string {
       }
     }
     
-    // Replace tabs with spaces in non-leading part to avoid mixing
-    restPart = restPart.replace(/\t/g, ' ');
+    // Use helper function to preserve whitespace in comments and strings
+    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
+      // Convert all tabs to spaces in non-leading positions (except in comments/strings)
+      return segment.replace(/\t/g, ' ');
+    });
     
-    return leadingPart + restPart;
+    return leadingPart + transformedRest;
   }).join('\n');
 }
 
+
+// Helper function to preserve whitespace in comments
+function preserveWhitespaceInComments(text: string, transform: (text: string) => string): string {
+  // Track comment state
+  let result = '';
+  let i = 0;
+  
+  while (i < text.length) {
+    // Check for start of line comment
+    if (i < text.length - 1 && text[i] === '/' && text[i + 1] === '/') {
+      // Line comment - preserve everything after //
+      result += text.substring(i);
+      break;
+    }
+    
+    // Check for start of block comment
+    if (i < text.length - 1 && text[i] === '/' && text[i + 1] === '*') {
+      // Find end of block comment
+      const commentStart = i;
+      i += 2;
+      while (i < text.length - 1) {
+        if (text[i] === '*' && text[i + 1] === '/') {
+          i += 2;
+          break;
+        }
+        i++;
+      }
+      // If we didn't find closing */, treat rest of line as comment
+      if (i >= text.length - 1 && !(text[i - 1] === '/' && text[i - 2] === '*')) {
+        i = text.length;
+      }
+      
+      // Preserve the entire comment as-is
+      result += text.substring(commentStart, i);
+      continue;
+    }
+    
+    // Check if we're inside a string literal
+    if (text[i] === '"' || text[i] === "'") {
+      const quote = text[i];
+      const stringStart = i;
+      i++;
+      
+      // Find end of string, handling escape sequences
+      while (i < text.length) {
+        if (text[i] === '\\') {
+          i += 2; // Skip escaped character
+          continue;
+        }
+        if (text[i] === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      
+      // Preserve the entire string as-is
+      result += text.substring(stringStart, i);
+      continue;
+    }
+    
+    // Not in comment or string - find next comment or string start
+    let nextSpecial = text.length;
+    
+    // Look for next comment or string
+    for (let j = i; j < text.length - 1; j++) {
+      if ((text[j] === '/' && (text[j + 1] === '/' || text[j + 1] === '*')) ||
+          text[j] === '"' || text[j] === "'") {
+        nextSpecial = j;
+        break;
+      }
+    }
+    
+    // Transform the non-comment, non-string part
+    const segment = text.substring(i, nextSpecial);
+    result += transform(segment);
+    i = nextSpecial;
+  }
+  
+  return result;
+}
 
 // Export fix functions for testing
 export { 
@@ -451,7 +653,13 @@ export {
   fixTabsToSpaces, 
   fixConsecutiveSpaces, 
   fixConsecutiveWhitespace, 
-  fixMixedSpacesAndTabs 
+  fixMixedSpacesAndTabs,
+  preserveWhitespaceInComments,
+  fixAllWhitespaceIssues,
+  parseCodeSegments,
+  fixCodeSegment,
+  fixNorminetteErrors,
+  runNorminette
 };
 
 async function main() {

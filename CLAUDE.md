@@ -23,17 +23,24 @@ The codebase follows a single-file MCP server architecture:
 - MCP Server setup with stdio transport for communication
 - Tool handlers for norminette operations
 - Error parsing and YAML output formatting
-- Automatic code fixing for common norminette violations
+- Advanced automatic code fixing with comment preservation
+
+**Key Fix Functions:**
+- `fixAllWhitespaceIssues()` - Main comprehensive fix function
+- `parseCodeSegments()` - Intelligently separates code, comments, and strings
+- `fixCodeSegment()` - Applies fixes only to code portions
+- `preserveWhitespaceInComments()` - Legacy helper for individual fix functions
 
 **Key Interfaces:**
 - `NorminetteError` - Structured representation of norminette error output
 - `NorminetteResult` - Complete norminette execution result with status and errors
 
 **Error Fixing Strategy:**
-The auto-fix functionality targets common formatting issues:
-- Trailing whitespace removal
-- Empty line normalization
-- Basic spacing corrections around operators and braces
+The auto-fix functionality uses a comprehensive approach with comment preservation:
+- **Comment-aware parsing**: Preserves all whitespace in C-style comments (`/* */`) and line comments (`//`)
+- **String literal preservation**: Maintains exact formatting within string literals
+- **Intelligent whitespace fixing**: Applies different rules for indentation vs content
+- **Comprehensive coverage**: Handles trailing spaces, empty lines, indentation, and spacing issues
 
 ## MCP Integration
 
@@ -135,13 +142,15 @@ The `tests/` directory contains comprehensive test cases:
 ### Auto-fixable Errors (by priority)
 
 #### High Priority - Whitespace & Tab Errors
-- `SPC_INSTEAD_TAB`: Spaces at beginning of line → Convert to tabs
-- `TAB_INSTEAD_SPC`: Found tab when expecting space → Convert to space
-- `CONSECUTIVE_SPC`: Two or more consecutive spaces → Reduce to single space
-- `CONSECUTIVE_WS`: Two or more consecutive white spaces → Normalize whitespace
-- `SPACE_EMPTY_LINE`: Space on empty line → Remove all whitespace
-- `SPC_BEFORE_NL`: Space before newline → Remove trailing spaces
-- `MIXED_SPACE_TAB`: Mixed spaces and tabs → Normalize to appropriate type
+- ✅ `SPC_INSTEAD_TAB`: Spaces at beginning of line → Convert to tabs
+- ✅ `TAB_INSTEAD_SPC`: Found tab when expecting space → Convert to space (preserves tabs before identifiers)
+- ✅ `CONSECUTIVE_SPC`: Two or more consecutive spaces → Reduce to single space
+- ✅ `CONSECUTIVE_WS`: Two or more consecutive white spaces → Normalize whitespace  
+- ✅ `SPACE_EMPTY_LINE`: Space on empty line → Remove all whitespace
+- ✅ `SPC_BEFORE_NL`: Space before newline → Remove trailing spaces
+- ✅ `MIXED_SPACE_TAB`: Mixed spaces and tabs → Normalize to appropriate type
+- ✅ `SPACE_BEFORE_FUNC`: Space before function name → Fixed through proper tab handling
+- ✅ `SPACE_REPLACE_TAB`: Space where tab expected → Fixed through comprehensive whitespace handling
 
 #### High Priority - Newline Errors
 - `EMPTY_LINE_FILE_START`: Empty line at start of file → Remove leading empty lines
@@ -229,7 +238,7 @@ The `tests/` directory contains comprehensive test cases:
 
 ### Norminette Auto-Fix Implementation Lessons
 
-Based on the implementation of space/tab-related error fixes, here are key insights:
+Based on the comprehensive implementation including comment preservation and advanced whitespace handling, here are key insights:
 
 #### 1. Error Analysis Strategy
 - **Start with error categorization**: Group errors by fix complexity (auto-fixable vs manual)
@@ -243,6 +252,21 @@ Based on the implementation of space/tab-related error fixes, here are key insig
 - **Leading vs non-leading logic**: Distinguish between indentation and content whitespace
 
 #### 3. Implementation Approach
+**Comprehensive Fix Pattern (Recommended):**
+```typescript
+// Main pattern: Parse segments first, then apply fixes
+function fixAllWhitespaceIssues(content: string): string {
+  const segments = parseCodeSegments(content);
+  return segments.map(segment => {
+    if (segment.type === 'comment' || segment.type === 'string') {
+      return segment.content; // Preserve exactly
+    }
+    return fixCodeSegment(segment.content); // Apply fixes
+  }).join('');
+}
+```
+
+**Legacy Line-by-Line Pattern:**
 ```typescript
 // Pattern: Process content, track changes, return modified result
 function fixSpecificError(content: string): string {
@@ -251,13 +275,12 @@ function fixSpecificError(content: string): string {
     // Skip empty lines when appropriate
     if (line.trim() === '') return line;
     
-    // Identify the area to modify (leading whitespace vs content)
+    // Use comment-aware helper
     const leadingWhitespace = line.match(/^[\t ]*/);
     const leadingPart = line.substring(0, leadingLength);
     const restPart = line.substring(leadingLength);
     
-    // Apply specific fix logic
-    // Return modified line
+    return leadingPart + preserveWhitespaceInComments(restPart, fixLogic);
   }).join('\n');
 }
 ```
@@ -271,8 +294,11 @@ function fixSpecificError(content: string): string {
 #### 5. Common Pitfalls & Solutions
 - **Tab vs Space counting**: Remember 1 tab = 4 spaces in norminette
 - **Leading vs non-leading**: Different rules apply to indentation vs content
+- **Comment preservation**: Multi-line comments require file-level parsing, not line-by-line
+- **Identifier spacing**: Tabs before function/variable names must be preserved 
 - **Order of operations**: Some fixes may conflict, apply in logical sequence
 - **Regex precision**: Use specific patterns to avoid over-matching
+- **42 Header preservation**: Headers contain carefully formatted ASCII art that must not be modified
 
 #### 6. Debugging Tips
 - **JSON.stringify() for visualization**: Shows invisible whitespace characters
@@ -303,3 +329,16 @@ function fixSpecificError(content: string): string {
 - **Priority ordering**: Implement high-impact, low-risk fixes first
 - **User feedback**: Track which fixes are most valuable to users
 - **Incremental improvement**: Add fix capabilities gradually with thorough testing
+
+## Tips & Memory Notes
+
+### Critical Implementation Details
+- **Comment Preservation**: The `fixAllWhitespaceIssues()` function uses `parseCodeSegments()` to correctly handle multi-line comments (`/* */`) and line comments (`//`) without modifying their internal whitespace
+- **Selective Tab Conversion**: Only converts tabs to spaces around operators/punctuation, preserves tabs before identifiers (functions, variables)
+- **42 Header Compatibility**: Fully preserves the elaborate 42 School header comments with their ASCII art formatting
+- **Comprehensive Coverage**: Handles `SPACE_BEFORE_FUNC`, `SPACE_REPLACE_TAB`, and other complex spacing errors that simple regex fixes cannot address
+
+### Constraints & Limitations
+- tips: @test/assets 以下をnorminette_fixのpathに与えることは禁止です
+- The legacy individual fix functions are maintained for backward compatibility but the comprehensive approach is preferred
+- Multi-line comment handling requires full-file parsing, making the solution more complex but more accurate

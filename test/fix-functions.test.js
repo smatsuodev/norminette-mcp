@@ -6,7 +6,10 @@ import {
   fixTabsToSpaces, 
   fixConsecutiveSpaces, 
   fixConsecutiveWhitespace, 
-  fixMixedSpacesAndTabs 
+  fixMixedSpacesAndTabs,
+  fixAllWhitespaceIssues,
+  parseCodeSegments,
+  fixCodeSegment
 } from '../dist/index.js';
 
 describe('Norminette Fix Functions', () => {
@@ -157,6 +160,140 @@ describe('Norminette Fix Functions', () => {
     });
   });
 
+  describe('Comment and string preservation tests', () => {
+    it('should preserve whitespace in line comments', () => {
+      const input = '\tcode;  // This\thas  multiple   spaces and\ttabs';
+      const expected = '\tcode; // This\thas  multiple   spaces and\ttabs';
+      
+      // Apply fixes that would normally change whitespace
+      let result = fixTabsToSpaces(input);
+      result = fixConsecutiveSpaces(result);
+      result = fixConsecutiveWhitespace(result);
+      
+      assert.equal(result, expected);
+    });
+
+    it('should preserve whitespace in block comments', () => {
+      const input = '\tcode; /* This\thas  multiple   spaces and\ttabs */';
+      const expected = '\tcode; /* This\thas  multiple   spaces and\ttabs */';
+      
+      // Apply fixes that would normally change whitespace
+      let result = fixTabsToSpaces(input);
+      result = fixConsecutiveSpaces(result);
+      result = fixConsecutiveWhitespace(result);
+      
+      assert.equal(result, expected);
+    });
+
+    it('should preserve whitespace in string literals', () => {
+      const input = '\tprintf("Hello\tworld  with   spaces");';
+      const expected = '\tprintf("Hello\tworld  with   spaces");';
+      
+      // Apply fixes that would normally change whitespace
+      let result = fixTabsToSpaces(input);
+      result = fixConsecutiveSpaces(result);
+      result = fixConsecutiveWhitespace(result);
+      
+      assert.equal(result, expected);
+    });
+
+    it('should fix whitespace outside comments but preserve inside', () => {
+      const input = '\tint  x\t=\t5;  // Comment\twith  tabs   and spaces';
+      const expected = '\tint x = 5; // Comment\twith  tabs   and spaces';
+      
+      // Apply fixes that would normally change whitespace
+      let result = fixTabsToSpaces(input);
+      result = fixConsecutiveSpaces(result);
+      result = fixConsecutiveWhitespace(result);
+      
+      assert.equal(result, expected);
+    });
+
+    it('should handle mixed comments and code correctly', () => {
+      const input = '\tif\t(x\t==\ty) /* mixed\ttabs */ printf("test\tstring");';
+      const expected = '\tif (x == y) /* mixed\ttabs */ printf("test\tstring");';
+      
+      // Apply fixes that would normally change whitespace
+      let result = fixTabsToSpaces(input);
+      result = fixConsecutiveSpaces(result);
+      result = fixConsecutiveWhitespace(result);
+      
+      assert.equal(result, expected);
+    });
+  });
+
+  describe('New comprehensive fix function', () => {
+    it('should handle multi-line comments correctly', () => {
+      const input = `/* This is a\n   multi-line comment\n   with  tabs\tand  spaces */\nint x = 5;`;
+      const result = fixAllWhitespaceIssues(input);
+      
+      // Comment should be preserved exactly
+      assert(result.includes('/* This is a\n   multi-line comment\n   with  tabs\tand  spaces */'));
+      // Code should be fixed
+      assert(result.includes('int x = 5;'));
+    });
+
+    it('should parse code segments correctly', () => {
+      const input = `code /* comment */ more code // line comment\nmore code`;
+      const segments = parseCodeSegments(input);
+      
+      assert.equal(segments.length, 5);
+      assert.equal(segments[0].type, 'code');
+      assert.equal(segments[0].content, 'code ');
+      assert.equal(segments[1].type, 'comment');
+      assert.equal(segments[1].content, '/* comment */');
+      assert.equal(segments[2].type, 'code');
+      assert.equal(segments[2].content, ' more code ');
+      assert.equal(segments[3].type, 'comment');
+      assert.equal(segments[3].content, '// line comment\n');
+      assert.equal(segments[4].type, 'code');
+      assert.equal(segments[4].content, 'more code');
+    });
+
+    it('should fix code segments according to requirements', () => {
+      const input = '    int  x\t=  5;  \n  \n        y = 6; ';
+      const result = fixCodeSegment(input);
+      
+      // Should convert leading spaces to tabs, fix consecutive spaces, remove trailing spaces
+      const expected = '\tint x = 5;\n\n\t\ty = 6;';
+      assert.equal(result, expected);
+    });
+
+    it('should handle complete 42 header correctly', () => {
+      const input = `/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   test.c                                              :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: user <user@student.42.fr>                   +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2024/01/01 12:00:00 by user              #+#    #+#             */
+/*   Updated: 2024/01/01 12:00:00 by user             ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include <stdio.h>
+
+int    main(void)  
+{
+    int  x   =   5;   
+    return (0);  
+}`;
+
+      const result = fixAllWhitespaceIssues(input);
+      
+      // Header should be completely preserved
+      assert(result.includes('/*                                                        :::      ::::::::   */'));
+      assert(result.includes('/*   test.c                                              :+:      :+:    :+:   */'));
+      
+      // Code should be fixed
+      assert(result.includes('#include <stdio.h>'));
+      assert(result.includes('\tint x = 5;'));
+      assert(!result.includes('int    main(void)  '));
+      assert(!result.includes('    int  x   =   5;   '));
+    });
+  });
+
   describe('Integration tests', () => {
     it('should handle complex real-world code', () => {
       const input = `int  function( int   x )  \n{\n    int  y   =   x + 1;     \n\t\tif (y > 0)  \n    {\n\t printf("Hello\tworld");  \n\t \t\treturn (y);\n\t}\n\treturn (0);\n}`;
@@ -180,6 +317,21 @@ describe('Norminette Fix Functions', () => {
       
       // Basic whitespace normalization should have occurred  
       assert(result.length < input.length, 'Should reduce overall size by removing excess whitespace');
+      
+      // Verify string literals are preserved
+      assert(result.includes('"Hello\tworld"'), 'Should preserve tabs in string literals');
+    });
+
+    it('should use new comprehensive function for better results', () => {
+      const input = `int  function( int   x )  \n{\n    int  y   =   x + 1;     \n\t\tif (y > 0)  \n    {\n\t printf("Hello\tworld");  \n\t \t\treturn (y);\n\t}\n\treturn (0);\n}`;
+      
+      const result = fixAllWhitespaceIssues(input);
+      
+      // Should preserve string literals
+      assert(result.includes('"Hello\tworld"'), 'Should preserve tabs in string literals');
+      // Should fix whitespace issues
+      assert(!result.includes('   '), 'Should not have 3+ consecutive spaces');
+      assert(!result.includes(' \n'), 'Should not have trailing spaces');
     });
   });
 });
