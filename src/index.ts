@@ -151,8 +151,9 @@ async function runNorminette(targetPath: string): Promise<NorminetteResult> {
     
     return parseNorminetteOutput(output, targetPath);
   } catch (error: any) {
-    if (error.stdout) {
-      return parseNorminetteOutput(error.stdout, targetPath);
+    const output = error.stdout || error.stderr || error.message;
+    if (output) {
+      return parseNorminetteOutput(output, targetPath);
     }
     throw new Error(`Failed to run norminette: ${error.message}`);
   }
@@ -168,16 +169,26 @@ function parseNorminetteOutput(output: string, targetPath: string): NorminetteRe
       filesChecked++;
     } else if (line.includes(': Error!')) {
       filesChecked++;
-    } else if (line.includes(': ')) {
-      const match = line.match(/^(.+?):(\d+):(\d+):\s*(.+?)\s*\((.+?)\)(.*)$/);
+    } else if (line.startsWith('Error: ')) {
+      // Parse error lines like: "Error: INVALID_HEADER       (line:   1, col:   1):	Missing or invalid 42 header"
+      const match = line.match(/^Error:\s+(\w+)\s+\(line:\s*(\d+),\s*col:\s*(\d+)\):\s*(.+)$/);
       if (match) {
+        // Get the current file from previous lines
+        let currentFile = targetPath;
+        for (let i = lines.indexOf(line) - 1; i >= 0; i--) {
+          if (lines[i].includes(': Error!') || lines[i].includes(': OK!')) {
+            currentFile = lines[i].split(':')[0].trim();
+            break;
+          }
+        }
+        
         errors.push({
-          file: match[1],
+          file: currentFile,
           line: parseInt(match[2]),
           column: parseInt(match[3]),
-          error_type: match[4].trim(),
-          error_code: match[5].trim(),
-          description: match[6].trim() || match[4].trim()
+          error_type: match[1],
+          error_code: match[1],
+          description: match[4].trim()
         });
       }
     }
@@ -252,7 +263,7 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
       fixResults.fixes_applied.push({
         file: filePath,
         fix: "Fixed empty lines at end of file"
-      });
+      })
     }
   }
 
@@ -306,6 +317,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("Server error:", error);
+  process.stderr.write(`Server error: ${error}\n`);
   process.exit(1);
 });
