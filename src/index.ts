@@ -245,78 +245,224 @@ function getAllCFiles(dir: string): string[] {
 
 async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
   let content = fs.readFileSync(filePath, 'utf-8');
-  let modified = false;
+  const originalContent = content;
+  const fixes: string[] = [];
 
-  content = fixTrailingSpaces(content);
-  if (content !== fs.readFileSync(filePath, 'utf-8')) {
-    modified = true;
+  // SPC_BEFORE_NL: Remove trailing spaces
+  const trailingSpaceFixed = fixTrailingSpaces(content);
+  if (trailingSpaceFixed !== content) {
+    content = trailingSpaceFixed;
+    fixes.push("SPC_BEFORE_NL: Removed trailing spaces");
+  }
+
+  // SPACE_EMPTY_LINE: Remove spaces on empty lines
+  const emptyLineSpaceFixed = fixSpaceOnEmptyLines(content);
+  if (emptyLineSpaceFixed !== content) {
+    content = emptyLineSpaceFixed;
+    fixes.push("SPACE_EMPTY_LINE: Removed spaces on empty lines");
+  }
+
+  // SPC_INSTEAD_TAB: Convert leading spaces to tabs
+  const leadingSpacesFixed = fixLeadingSpaces(content);
+  if (leadingSpacesFixed !== content) {
+    content = leadingSpacesFixed;
+    fixes.push("SPC_INSTEAD_TAB: Converted leading spaces to tabs");
+  }
+
+  // TAB_INSTEAD_SPC: Convert tabs to spaces where needed (not at line start)
+  const tabsToSpacesFixed = fixTabsToSpaces(content);
+  if (tabsToSpacesFixed !== content) {
+    content = tabsToSpacesFixed;
+    fixes.push("TAB_INSTEAD_SPC: Converted tabs to spaces where needed");
+  }
+
+  // CONSECUTIVE_SPC: Fix consecutive spaces
+  const consecutiveSpacesFixed = fixConsecutiveSpaces(content);
+  if (consecutiveSpacesFixed !== content) {
+    content = consecutiveSpacesFixed;
+    fixes.push("CONSECUTIVE_SPC: Fixed consecutive spaces");
+  }
+
+  // CONSECUTIVE_WS: Fix consecutive whitespaces
+  const consecutiveWhitespaceFixed = fixConsecutiveWhitespace(content);
+  if (consecutiveWhitespaceFixed !== content) {
+    content = consecutiveWhitespaceFixed;
+    fixes.push("CONSECUTIVE_WS: Fixed consecutive whitespace");
+  }
+
+  // MIXED_SPACE_TAB: Fix mixed spaces and tabs
+  const mixedSpaceTabFixed = fixMixedSpacesAndTabs(content);
+  if (mixedSpaceTabFixed !== content) {
+    content = mixedSpaceTabFixed;
+    fixes.push("MIXED_SPACE_TAB: Fixed mixed spaces and tabs");
+  }
+
+
+  if (content !== originalContent) {
+    fs.writeFileSync(filePath, content);
     fixResults.fixes_applied.push({
       file: filePath,
-      fix: "Removed trailing spaces"
+      fixes: fixes
     });
-  }
-
-  content = fixEmptyLines(content);
-  if (modified || content !== fs.readFileSync(filePath, 'utf-8')) {
-    modified = true;
-    if (!fixResults.fixes_applied.some((f: any) => f.file === filePath && f.fix.includes("empty lines"))) {
-      fixResults.fixes_applied.push({
-        file: filePath,
-        fix: "Fixed empty lines at end of file"
-      })
-    }
-  }
-
-  content = fixSpacing(content);
-  if (modified || content !== fs.readFileSync(filePath, 'utf-8')) {
-    modified = true;
-    if (!fixResults.fixes_applied.some((f: any) => f.file === filePath && f.fix.includes("spacing"))) {
-      fixResults.fixes_applied.push({
-        file: filePath,
-        fix: "Fixed spacing issues"
-      });
-    }
-  }
-
-  if (modified) {
-    fs.writeFileSync(filePath, content);
   }
 }
 
+// SPC_BEFORE_NL: Remove trailing spaces
 function fixTrailingSpaces(content: string): string {
   return content.replace(/[ \t]+$/gm, '');
 }
 
-function fixEmptyLines(content: string): string {
-  content = content.replace(/\n{3,}/g, '\n\n');
-  
-  if (!content.endsWith('\n')) {
-    content += '\n';
-  } else {
-    content = content.replace(/\n+$/, '\n');
-  }
-  
-  return content;
+// SPACE_EMPTY_LINE: Remove spaces on empty lines
+function fixSpaceOnEmptyLines(content: string): string {
+  return content.replace(/^[ \t]+$/gm, '');
 }
 
-function fixSpacing(content: string): string {
-  content = content.replace(/\s*\{\s*/g, '\n{\n');
-  content = content.replace(/\s*\}\s*/g, '\n}\n');
-  content = content.replace(/;(\w)/g, '; $1');
-  content = content.replace(/,(\w)/g, ', $1');
-  content = content.replace(/([^=!<>])=([^=])/g, '$1 = $2');
-  content = content.replace(/([^=!<>])==([^=])/g, '$1 == $2');
-  content = content.replace(/([^=!<>])!=([^=])/g, '$1 != $2');
-  
-  return content;
+// SPC_INSTEAD_TAB: Convert leading spaces to tabs
+function fixLeadingSpaces(content: string): string {
+  const lines = content.split('\n');
+  return lines.map(line => {
+    // Count leading spaces and convert groups of 4 spaces to tabs
+    const leadingSpaces = line.match(/^( +)/);
+    if (leadingSpaces) {
+      const spaceCount = leadingSpaces[1].length;
+      const tabCount = Math.floor(spaceCount / 4);
+      const remainingSpaces = spaceCount % 4;
+      const tabs = '\t'.repeat(tabCount);
+      const spaces = ' '.repeat(remainingSpaces);
+      return tabs + spaces + line.substring(spaceCount);
+    }
+    return line;
+  }).join('\n');
 }
+
+// TAB_INSTEAD_SPC: Convert tabs to spaces where needed (not at line start)
+function fixTabsToSpaces(content: string): string {
+  const lines = content.split('\n');
+  return lines.map(line => {
+    // Skip empty lines
+    if (line.trim() === '') return line;
+    
+    // Find the end of leading whitespace
+    const leadingWhitespace = line.match(/^[\t ]*/);
+    const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
+    
+    // Replace tabs with spaces in the non-leading part
+    const leadingPart = line.substring(0, leadingLength);
+    const restPart = line.substring(leadingLength).replace(/\t/g, ' ');
+    
+    return leadingPart + restPart;
+  }).join('\n');
+}
+
+// CONSECUTIVE_SPC: Fix consecutive spaces (except at line start)
+function fixConsecutiveSpaces(content: string): string {
+  const lines = content.split('\n');
+  return lines.map(line => {
+    // Skip empty lines
+    if (line.trim() === '') return line;
+    
+    // Find the end of leading whitespace (tabs and spaces at start)
+    const leadingWhitespace = line.match(/^[\t ]*/);
+    const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
+    
+    // Fix consecutive spaces in the non-leading part
+    const leadingPart = line.substring(0, leadingLength);
+    let restPart = line.substring(leadingLength);
+    
+    // Replace consecutive spaces with single space
+    restPart = restPart.replace(/ {2,}/g, ' ');
+    
+    return leadingPart + restPart;
+  }).join('\n');
+}
+
+// CONSECUTIVE_WS: Fix consecutive whitespace characters
+function fixConsecutiveWhitespace(content: string): string {
+  const lines = content.split('\n');
+  return lines.map(line => {
+    // Skip empty lines
+    if (line.trim() === '') return line;
+    
+    // Find the end of leading whitespace
+    const leadingWhitespace = line.match(/^[\t ]*/);
+    const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
+    
+    // Fix consecutive whitespace in the non-leading part
+    const leadingPart = line.substring(0, leadingLength);
+    const restPart = line.substring(leadingLength).replace(/[ \t]{2,}/g, match => {
+      // If it's all spaces, reduce to one space
+      if (match.match(/^ +$/)) return ' ';
+      // If it's all tabs, reduce to one tab
+      if (match.match(/^\t+$/)) return '\t';
+      // If mixed, convert to single space
+      return ' ';
+    });
+    
+    return leadingPart + restPart;
+  }).join('\n');
+}
+
+// MIXED_SPACE_TAB: Fix mixed spaces and tabs
+function fixMixedSpacesAndTabs(content: string): string {
+  const lines = content.split('\n');
+  return lines.map(line => {
+    // Skip empty lines
+    if (line.trim() === '') return line;
+    
+    // Check for mixed spaces and tabs in leading whitespace
+    const leadingWhitespace = line.match(/^[\t ]*/);
+    let leadingPart = '';
+    let restPart = line;
+    
+    if (leadingWhitespace) {
+      const leading = leadingWhitespace[0];
+      const leadingLength = leading.length;
+      
+      // If there are mixed spaces and tabs in leading whitespace
+      if (leading.includes(' ') && leading.includes('\t')) {
+        // Convert all to tabs (groups of 4 spaces = 1 tab)
+        const totalSpaces = leading.split('').reduce((count, char) => {
+          return count + (char === '\t' ? 4 : 1);
+        }, 0);
+        const tabCount = Math.floor(totalSpaces / 4);
+        const remainingSpaces = totalSpaces % 4;
+        leadingPart = '\t'.repeat(tabCount) + ' '.repeat(remainingSpaces);
+        restPart = line.substring(leadingLength);
+      } else {
+        // No mixed leading whitespace, keep as is
+        leadingPart = leading;
+        restPart = line.substring(leadingLength);
+      }
+    }
+    
+    // Replace tabs with spaces in non-leading part to avoid mixing
+    restPart = restPart.replace(/\t/g, ' ');
+    
+    return leadingPart + restPart;
+  }).join('\n');
+}
+
+
+// Export fix functions for testing
+export { 
+  fixTrailingSpaces, 
+  fixSpaceOnEmptyLines, 
+  fixLeadingSpaces, 
+  fixTabsToSpaces, 
+  fixConsecutiveSpaces, 
+  fixConsecutiveWhitespace, 
+  fixMixedSpacesAndTabs 
+};
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-main().catch((error) => {
-  process.stderr.write(`Server error: ${error}\n`);
-  process.exit(1);
-});
+// Only run the server if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    process.stderr.write(`Server error: ${error}\n`);
+    process.exit(1);
+  });
+}
