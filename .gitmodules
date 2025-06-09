@@ -1,0 +1,3 @@
+[submodule "norminette"]
+	path = norminette
+	url = https://github.com/42school/norminette.git
