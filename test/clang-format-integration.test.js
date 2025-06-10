@@ -23,7 +23,7 @@ describe('clang-format Integration System', () => {
       
       assert(typeof configString === 'string');
       assert(configString.includes('Language: Cpp'));
-      assert(configString.includes('UseTab: ForContinuationAndIndentation'));
+      assert(configString.includes('UseTab: Always'));
       assert(configString.includes('ColumnLimit: 1024'));
       assert(configString.includes('TabWidth: 4'));
       assert(!configString.includes('---'));

@@ -32,13 +32,11 @@ if [ -d "tmp" ]; then
     fi
 fi
 
-# Check if the project is built
-if [ ! -f "dist/index.js" ]; then
-    echo "⚠️  Project not built. Building now..."
-    npm run build
-    echo "✅ Build completed"
-    echo
-fi
+# Always rebuild the project to ensure latest changes
+echo "🔨 Building project to ensure latest changes..."
+npm run build
+echo "✅ Build completed"
+echo
 
 # Run the accuracy measurement
 echo "🔍 Running accuracy measurement..."
