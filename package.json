@@ -1,6 +1,6 @@
 {
   "name": "norminette-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for 42 School norminette coding standard checker",
   "main": "dist/index.js",
   "type": "module",
