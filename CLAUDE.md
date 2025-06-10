@@ -27,47 +27,70 @@ This is an MCP (Model Context Protocol) server that provides tools for working w
 
 ## Architecture
 
-### ✅ Current Implementation: Hybrid clang-format + Lexer-based Token Formatter System
+### ✅ Current Implementation: Structural Fixes + Hybrid clang-format + Lexer-based Token Formatter System
 
 **Core Components:**
 - MCP Server setup with stdio transport for communication
 - Tool handlers for norminette operations  
 - Error parsing and YAML output formatting
+- **Structural fixes for file-level modifications (42 header generation)**
 - **clang-format integration with 42 School configuration**
 - **Lexer-based token formatter for precise norminette error fixing**
 - Error categorization system (85 fixable errors across 3 categories)
 
-**Implemented Hybrid Fixing Architecture:**
-The system employs a **three-stage approach** with intelligent error routing:
+**Implemented Multi-Stage Fixing Architecture:**
+The system employs a **four-stage approach** with intelligent error routing:
 
-1. **✅ clang-format Integration (ACTIVE)**
+1. **✅ Structural Fixes (ACTIVE - Phase 4)**
+   - File-level structural modifications (different from token-based fixes)
+   - 42 header generation and updates for INVALID_HEADER errors
+   - Extensible framework for future structural fixes
+   - **Key components**:
+     - `StructuralFixer` interface for structural modifications
+     - `headerFixer` implementation for 42 header management
+     - System info retrieval (username, email, timestamps)
+   - **Proven effective**: Fixed 73 INVALID_HEADER errors in test suite
+
+2. **✅ clang-format Integration (ACTIVE)**
    - 42 School compliant `.clang-format` configuration generation
    - Automatic baseline formatting for whitespace/indentation/spacing
    - Handles 21 whitespace & formatting error types
    - External tool availability checking with graceful fallback
    - **Proven effective**: Reduces norminette errors by ~73% in real files
 
-2. **✅ Lexer-based Token Formatter (ACTIVE - Phase 3)**
+3. **✅ Lexer-based Token Formatter (ACTIVE - Phase 3)**
    - Complete C language lexer with accurate position tracking
    - Token-based formatting rules for precise error fixing
-   - Currently implements 2 core formatter rules:
-     - `SPACE_BEFORE_FUNC`: Tab between return type and function name (`int main()` → `int\tmain()`)
-     - `SPACE_REPLACE_TAB`: Tab in variable declarations (`int x;` → `int\tx;`)
+   - Currently implements 6 core formatter rules:
+     - `SPACE_BEFORE_FUNC`: Tab between return type and function name
+     - `SPACE_REPLACE_TAB`: Tab in variable declarations
+     - `SPC_AFTER_POINTER`: Remove space after asterisk
+     - `SPC_BFR_POINTER`: Ensure proper spacing before pointer
+     - `MISSING_TAB_FUNC`: Add missing tabs in function declarations
+     - `MISSING_TAB_VAR`: Add missing tabs in variable declarations
    - **Architecture advantages**: Token-level manipulation with complete source fidelity
-   - **Proven effective**: 100% test success rate (23/23 tests), handles complex multi-line scenarios
+   - **Proven effective**: 100% test success rate (30/30 tests), handles complex multi-line scenarios
 
-3. **✅ Error Categorization System (ACTIVE)**
+4. **✅ Error Categorization System (ACTIVE)**
+   - **Structural**: File-level issues → Structural fixes (1 implemented: INVALID_HEADER)
    - **Whitespace & Formatting**: 21 errors → clang-format handles these
-   - **Norminette-specific**: 39 errors → Token formatter handles these (2 implemented, 37 planned)
+   - **Norminette-specific**: 39 errors → Token formatter handles these (6 implemented, 33 planned)
    - **Unfixable**: 25 errors → Excluded from auto-fix (structural/naming issues)
    - Smart error routing for optimal fixing strategy
 
-4. **✅ Fallback Mechanism (ACTIVE)**
+5. **✅ Fallback Mechanism (ACTIVE)**
    - Simple regex-based whitespace fixes when clang-format unavailable
    - Graceful degradation ensures system always functions
    - Maintains backward compatibility
 
 **Key Implemented Components:**
+- `applyStructuralFixes()` - Apply file-level structural modifications
+- `StructuralFixer` - Interface for structural fix implementations
+- `headerFixer` - 42 header generation and update implementation
+- `generate42Header()` - Create valid 42 headers with user info
+- `has42Header()` - Detect existing 42 headers
+- `update42Header()` - Update headers while preserving creation info
+- `getSystemInfo()` - Retrieve username, email, and timestamps
 - `applyClangFormat()` - Core clang-format integration
 - `applyClangFormatWithFallback()` - Robust formatting with fallback
 - `generate42SchoolClangFormatConfig()` - 42 School configuration generator
@@ -79,20 +102,23 @@ The system employs a **three-stage approach** with intelligent error routing:
 **Key Interfaces:**
 - `NorminetteError` - Structured representation of norminette error output
 - `NorminetteResult` - Complete norminette execution result with status and errors
+- `StructuralFixer` - Interface for file-level structural modifications
 - `Token` - Position-aware token with type and value information
 - `TokenFormatterRule` - Rule definition with canFix/apply methods for token manipulation
 - `Position` - Line/column position tracking interface
 - `TokenType` - Comprehensive C language token type definitions
+- `SystemInfo` - User and system information for header generation
 
 **Current Error Fixing Pipeline:**
 1. **Initial Check**: Run norminette → Exit if no errors
-2. **clang-format Stage**: Apply 42 School formatting → Fixes whitespace/spacing errors
-3. **Token Formatter Stage**: 
+2. **Structural Fixes Stage**: Apply file-level fixes (42 header, etc.) → Fixes structural issues
+3. **clang-format Stage**: Apply 42 School formatting → Fixes whitespace/spacing errors
+4. **Token Formatter Stage**: 
    - Tokenize source code with complete C lexer
    - Apply token-based formatting rules for norminette-specific errors
    - Reconstruct source code with precise position fidelity
-4. **Final Validation**: Re-run norminette → Report remaining errors
-5. **Result**: Structured output with fixes applied and remaining issues
+5. **Final Validation**: Re-run norminette → Report remaining errors
+6. **Result**: Structured output with fixes applied and remaining issues
 
 ### 🎯 Implementation Status
 
@@ -106,17 +132,33 @@ The system employs a **three-stage approach** with intelligent error routing:
 **✅ Completed (Phase 3 - Lexer-based Token Formatter):**
 - Complete C language lexer implementation (`src/lexer/`)
 - Token-based formatting engine with position tracking
-- 2 core formatter rules implemented (SPACE_BEFORE_FUNC, SPACE_REPLACE_TAB)
+- 6 core formatter rules implemented:
+  - `SPACE_BEFORE_FUNC`: Fix function name spacing
+  - `SPACE_REPLACE_TAB`: Fix variable declaration spacing
+  - `SPC_AFTER_POINTER`: Fix pointer asterisk spacing
+  - `SPC_BFR_POINTER`: Fix spacing before pointer
+  - `MISSING_TAB_FUNC`: Add tabs in function declarations
+  - `MISSING_TAB_VAR`: Add tabs in variable declarations
 - Modular architecture split from monolithic `index.ts`
-- Comprehensive test suite: 23 tests, 100% pass rate
+- Comprehensive test suite: 30 tests, 100% pass rate
 - Real-world validation: Complex multi-line code formatting support
 - Accurate line number tracking with `advanceWithNewline()` method
 
-**🔄 Next Phase (Phase 4):**
-- Implement remaining 37 norminette-specific formatter rules
+**✅ Completed (Phase 4 - Structural Fixes):**
+- Structural fixes framework (`src/structural-fixes.ts`)
+- 42 header generation and management (`src/header-generator.ts`)
+- System information retrieval (`src/system-info.ts`)
+- INVALID_HEADER auto-fix implementation
+- Integration with existing pipeline as first stage
+- Test suite for header generation functionality
+- Real-world validation: Fixed 73 INVALID_HEADER errors
+
+**🔄 Next Phase (Phase 5):**
+- Implement remaining 33 norminette-specific formatter rules
+- Add more structural fixers (e.g., header protection, include ordering)
 - Expand lexer to handle edge cases (complex comments, string escapes)
 - Performance optimization for large file processing
-- Add more sophisticated token pattern matching
+- Improve clang-format configuration to reduce new errors introduced
 
 ## MCP Integration
 
@@ -363,7 +405,7 @@ The `tests/` directory contains comprehensive test cases:
 - `TOO_MANY_VALS`: Too many values on define
 
 #### Header & Include Issues
-- `INVALID_HEADER`: Missing or invalid 42 header
+- ~`INVALID_HEADER`: Missing or invalid 42 header~ ✅ **IMPLEMENTED** via structural fixes
 - `HEADER_PROT_ALL`: Header protection must include all the instructions
 - `HEADER_PROT_ALL_AF`: Instructions after header protection are forbidden
 - `HEADER_PROT_NAME`: Wrong header protection name
@@ -504,19 +546,27 @@ const spaceBeforeFuncRule: NorminetteRule = {
 - **Norminette-specific (39 errors)**: Rule engine handles (6 implemented, 33 planned)
 - **Unfixable (25 errors)**: Structural/naming issues requiring manual fixes
 
-**Hybrid Pipeline Pattern:**
+**Multi-Stage Pipeline Pattern:**
 ```typescript
 async function fixFileErrors(filePath: string): Promise<void> {
   let content = fs.readFileSync(filePath, 'utf-8');
   
-  // Stage 1: clang-format
+  // Stage 1: Structural fixes (42 header, etc.)
+  const initialErrors = await runNorminette(filePath);
+  if (initialErrors.errors.length > 0) {
+    const structuralResult = await applyStructuralFixes(content, filePath, initialErrors.errors);
+    content = structuralResult.content;
+  }
+  
+  // Stage 2: clang-format
   const formatResult = await applyClangFormatWithFallback(content);
   content = formatResult.formatted;
   
-  // Stage 2: Rule engine for remaining errors
+  // Stage 3: Token formatter for remaining errors
+  fs.writeFileSync(filePath, content);
   const errors = await runNorminette(filePath);
-  if (errors.length > 0) {
-    content = ruleEngine.applyRules(content, errors);
+  if (errors.errors.length > 0) {
+    content = formatter.format(content, errors.errors);
   }
   
   fs.writeFileSync(filePath, content);
@@ -527,17 +577,20 @@ async function fixFileErrors(filePath: string): Promise<void> {
 
 **✅ Successful Strategies:**
 - **Incremental replacement**: Replace legacy system piece by piece
-- **Comprehensive testing**: 30 test cases covering all aspects (clang-format + rule engine)
+- **Comprehensive testing**: 30+ test cases covering all aspects (structural + clang-format + rule engine)
 - **Real-world validation**: Test with actual norminette files
 - **Graceful degradation**: Always provide working fallback
 - **Pattern-based rules**: Use regex patterns for precise error detection and fixing
 - **Priority execution**: Apply rules in order of importance to avoid conflicts
+- **Separation of concerns**: Structural fixes vs formatting fixes vs token-level fixes
 
-**🔄 Future Implementation Notes (Phase 2b):**
+**🔄 Future Implementation Notes (Phase 5):**
 - Implement remaining 33 norminette-specific error rules
+- Add more structural fixers (header protection, include ordering)
 - Add complex pattern matching for edge cases (e.g., CONSECUTIVE_SPC, MISALIGNED_VAR_DECL)
 - Consider AST integration for context-aware fixes in complex scenarios
 - Performance optimization for large file processing
+- Improve clang-format config to handle preprocessor indentation correctly
 
 ### Constraints & Limitations
 
@@ -555,23 +608,26 @@ async function fixFileErrors(filePath: string): Promise<void> {
 
 **Development Guidelines:**
 - **Prohibited**: @test/assets 以下をnorminette_fixのpathに与えることは禁止です
-- **✅ Current State**: Hybrid system with clang-format + rule engine (6 rules) active
-- **Performance Requirements**: Maintain fast execution (~540ms for 30 tests)
-- **Quality Standards**: All code has comprehensive test coverage (30 test cases, 100% pass rate)
+- **✅ Current State**: Multi-stage system with structural fixes + clang-format + rule engine (6 rules) active
+- **Performance Requirements**: Maintain fast execution (~540ms for 30+ tests)
+- **Quality Standards**: All code has comprehensive test coverage (30+ test cases, 100% pass rate)
 - **Fallback Required**: Always provide graceful degradation when external tools fail
 - **Testing Pattern**: Individual rule tests + integration tests + edge case handling
 
-**Phase 2b Development Priorities:**
+**Phase 5 Development Priorities:**
 1. Implement remaining 33 norminette-specific error rules
-2. Focus on pattern-based fixes first, consider AST for complex cases
-3. Maintain backward compatibility with current hybrid system
-4. Ensure performance does not degrade with additional rules
+2. Add more structural fixers (header protection, include ordering)
+3. Focus on pattern-based fixes first, consider AST for complex cases
+4. Maintain backward compatibility with current multi-stage system
+5. Ensure performance does not degrade with additional rules
 
-**Key Implementation Insights from Phase 2a:**
+**Key Implementation Insights:**
 - **Array handling**: Variable declaration patterns must support arrays (e.g., `char buffer[100]`)
 - **Regex precision**: Patterns must be specific to avoid false positives
 - **Line tracking**: Rule engine must adjust line numbers when fixes change file length
 - **Testing importance**: Each rule needs individual tests + integration verification
+- **Stage ordering**: Structural fixes must run first to avoid conflicts with formatting
+- **Environment handling**: System info retrieval must handle missing environment variables gracefully
 
 ## npm Package Publishing Guide
 

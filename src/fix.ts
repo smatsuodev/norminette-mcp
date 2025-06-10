@@ -5,6 +5,7 @@ import { NorminetteFormatter } from "./norminette-formatter.js";
 import { defaultFormattingRules } from "./formatting-rules.js";
 import { getAllCFiles } from "./file-utils.js";
 import { FixResult } from "./types.js";
+import { applyStructuralFixes } from "./structural-fixes.js";
 
 const formatter = new NorminetteFormatter();
 
@@ -44,7 +45,17 @@ async function fixFileErrors(filePath: string, fixResults: FixResult): Promise<v
   const originalContent = content;
   const fixes: string[] = [];
 
-  // Stage 1: Apply clang-format
+  // Stage 1: Apply structural fixes (e.g., 42 header)
+  const initialErrors = await runNorminette(filePath);
+  if (initialErrors.errors.length > 0) {
+    const structuralResult = await applyStructuralFixes(content, filePath, initialErrors.errors);
+    if (structuralResult.content !== content) {
+      content = structuralResult.content;
+      fixes.push(...structuralResult.applied.map(fix => `Applied ${fix}`));
+    }
+  }
+
+  // Stage 2: Apply clang-format
   const formatResult = await applyClangFormatWithFallback(content);
   if (formatResult.formatted !== content) {
     content = formatResult.formatted;
@@ -55,7 +66,7 @@ async function fixFileErrors(filePath: string, fixResults: FixResult): Promise<v
     }
   }
 
-  // Stage 2: Apply norminette-specific formatter
+  // Stage 3: Apply norminette-specific formatter
   // Write intermediate content to get accurate norminette errors
   fs.writeFileSync(filePath, content);
   const errors = await runNorminette(filePath);

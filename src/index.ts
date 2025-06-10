@@ -145,6 +145,10 @@ export type { NorminetteError, NorminetteResult, FixResult } from "./types.js";
 export type { TokenFormatterRule } from "./norminette-formatter.js";
 export { CLexer } from "./lexer/lexer.js";
 export { Token, TokenType } from "./lexer/token.js";
+export { generate42Header, has42Header, update42Header, extractHeaderInfo } from "./header-generator.js";
+export { getSystemInfo, getFileCreationTime } from "./system-info.js";
+export { applyStructuralFixes, structuralFixers } from "./structural-fixes.js";
+export type { StructuralFixer } from "./structural-fixes.js";
 
 async function main() {
   const transport = new StdioServerTransport();
