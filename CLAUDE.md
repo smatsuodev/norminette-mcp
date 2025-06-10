@@ -342,3 +342,130 @@ function fixSpecificError(content: string): string {
 - tips: @test/assets 以下をnorminette_fixのpathに与えることは禁止です
 - The legacy individual fix functions are maintained for backward compatibility but the comprehensive approach is preferred
 - Multi-line comment handling requires full-file parsing, making the solution more complex but more accurate
+
+## npm Package Publishing Guide
+
+### Publishing MCP Servers as npm Packages
+
+Based on the implementation of this project, here are key insights for publishing MCP servers as npm packages:
+
+#### 1. Package Configuration Essentials
+
+**Executable Setup:**
+- Add `bin` field in package.json to enable `npx` execution
+- Use postbuild script to inject shebang line: `#!/usr/bin/env node`
+- Ensure executable permissions with `chmod +x`
+
+**Essential package.json fields:**
+```json
+{
+  "name": "your-mcp-server",
+  "version": "0.1.0",  // Start with 0.x for initial releases
+  "bin": {
+    "your-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "postbuild": "echo '#!/usr/bin/env node' | cat - dist/index.js > temp && mv temp dist/index.js && chmod +x dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": ["dist/", "README.md", "LICENSE"],
+  "type": "module"  // For ES modules
+}
+```
+
+#### 2. File Management
+
+**.npmignore essentials:**
+- Source files (`src/`)
+- Test files (`test/`)
+- TypeScript config (`tsconfig.json`)
+- Development files (`CLAUDE.md`, `.github/`)
+- Git submodules (if any)
+
+**Files to include:**
+- Built JavaScript (`dist/`)
+- README.md with MCP client configuration examples
+- LICENSE file
+
+#### 3. Documentation Requirements
+
+**README.md must include:**
+- Installation instructions for both `npx` and global install
+- MCP client configuration examples (Claude Desktop, etc.)
+- Tool descriptions and capabilities
+- External dependencies (e.g., Python packages)
+
+**Configuration example format:**
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "npx",
+      "args": ["package-name"]
+    }
+  }
+}
+```
+
+#### 4. Version Management with Git Tags
+
+**Workflow:**
+1. Use semantic versioning (start with 0.1.0)
+2. Leverage npm version commands:
+   - `npm version patch` (0.1.0 → 0.1.1)
+   - `npm version minor` (0.1.1 → 0.2.0)
+   - `npm version major` (0.2.0 → 1.0.0)
+3. Push with tags: `git push && git push --tags`
+
+**GitHub Actions for automated publishing:**
+- Trigger on tag push (`tags: 'v*'`)
+- Build, test, and publish automatically
+- Create GitHub releases
+
+#### 5. External Dependencies Handling
+
+**For projects with external dependencies (like norminette):**
+- Don't bundle external tools in npm package
+- Document installation requirements clearly
+- Consider Docker as alternative distribution method
+- Use peerDependencies for npm packages
+
+#### 6. Pre-publish Checklist
+
+Before publishing:
+- [ ] Verify package name availability: `npm view package-name`
+- [ ] Test executable with `npx`: `npx ./`
+- [ ] Ensure all metadata fields are complete
+- [ ] Add comprehensive error handling
+- [ ] Test with actual MCP clients
+- [ ] Set up NPM_TOKEN in GitHub Secrets
+
+#### 7. Common Pitfalls to Avoid
+
+- **Missing shebang**: Won't work as CLI without `#!/usr/bin/env node`
+- **Wrong file permissions**: Executable must have +x permission
+- **Including unnecessary files**: Use .npmignore to keep package lean
+- **Forgetting prepublishOnly**: Ensure fresh build before publish
+- **Submodule issues**: Git submodules aren't included by npm
+
+#### 8. Testing Before Release
+
+```bash
+# Build and test locally
+npm run build
+npm link
+your-mcp-server  # Test global command
+
+# Test with npx
+npx ./  # From project root
+
+# Dry run publish
+npm publish --dry-run
+```
+
+### Release Process Summary
+
+1. **Initial Setup**: Configure package.json, create docs, set up CI
+2. **Version Management**: Use `npm version` + git tags
+3. **Automated Publishing**: GitHub Actions on tag push
+4. **Manual First Publish**: `npm publish` (subsequent releases automated)

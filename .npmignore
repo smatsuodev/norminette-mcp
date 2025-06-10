@@ -1,0 +1,44 @@
+# Source files
+src/
+
+# Test files
+test/
+
+# TypeScript config
+tsconfig.json
+
+# Development dependencies
+node_modules/
+
+# Git files
+.git/
+.gitignore
+.gitmodules
+
+# Norminette submodule (will be handled separately)
+norminette/
+
+# IDE files
+.vscode/
+.idea/
+
+# macOS files
+.DS_Store
+
+# Documentation sources
+*.md
+!README.md
+
+# GitHub files
+.github/
+
+# Local environment files
+.env
+.env.*
+
+# Build artifacts that shouldn't be published
+*.log
+*.tgz
+
+# Development files
+CLAUDE.md
