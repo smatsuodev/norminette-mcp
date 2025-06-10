@@ -40,7 +40,7 @@ KeepEmptyLinesAtTheStartOfBlocks: false
 InsertNewlineAtEOF: true`;
 }
 
-export async function checkClangFormatAvailability(): Promise<boolean> {
+export function checkClangFormatAvailability(): boolean {
   try {
     execSync('clang-format --version', { 
       encoding: 'utf-8', 
@@ -54,7 +54,7 @@ export async function checkClangFormatAvailability(): Promise<boolean> {
 }
 
 export async function applyClangFormat(content: string): Promise<string> {
-  const isAvailable = await checkClangFormatAvailability();
+  const isAvailable = checkClangFormatAvailability();
   if (!isAvailable) {
     throw new Error('clang-format is not available on this system');
   }

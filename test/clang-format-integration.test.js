@@ -9,8 +9,8 @@ import {
 describe('clang-format Integration System', () => {
   
   describe('clang-format Availability', () => {
-    it('should check if clang-format is available', async () => {
-      const available = await checkClangFormatAvailability();
+    it('should check if clang-format is available', () => {
+      const available = checkClangFormatAvailability();
       assert.equal(typeof available, 'boolean');
       console.log('  clang-format available:', available);
     });
@@ -44,7 +44,7 @@ return 0;
     it('should apply clang-format when available', async function() {
       this.timeout(10000); // clang-format may take time
       
-      const available = await checkClangFormatAvailability();
+      const available = checkClangFormatAvailability();
       if (!available) {
         console.log('  Skipping clang-format test - not available');
         this.skip();
