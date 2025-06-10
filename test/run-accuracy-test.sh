@@ -12,6 +12,26 @@ echo "🧪 Starting Norminette Accuracy Measurement"
 echo "Project root: $PROJECT_ROOT"
 echo
 
+# Rotate old logs
+if [ -d "tmp" ]; then
+    YML_FILES=(tmp/*.yml)
+    if [ -f "${YML_FILES[0]}" ]; then
+        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        ARCHIVE_DIR="tmp/archive_$TIMESTAMP"
+        mkdir -p "$ARCHIVE_DIR"
+        
+        echo "📁 Rotating old log files to $ARCHIVE_DIR"
+        for file in tmp/*.yml; do
+            if [ -f "$file" ]; then
+                echo "  Moving $file to $ARCHIVE_DIR/"
+                mv "$file" "$ARCHIVE_DIR/"
+            fi
+        done
+        echo "✅ Log rotation completed"
+        echo
+    fi
+fi
+
 # Check if the project is built
 if [ ! -f "dist/index.js" ]; then
     echo "⚠️  Project not built. Building now..."

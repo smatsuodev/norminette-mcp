@@ -52,14 +52,28 @@ async function main() {
 }
 
 function setupDirectories() {
-    // Remove existing tmp directory if it exists
-    if (fs.existsSync(TMP_DIR)) {
-        fs.rmSync(TMP_DIR, { recursive: true, force: true });
+    // Create tmp directory if it doesn't exist
+    if (!fs.existsSync(TMP_DIR)) {
+        fs.mkdirSync(TMP_DIR, { recursive: true });
     }
     
-    // Create fresh directories
-    fs.mkdirSync(TMP_DIR, { recursive: true });
+    // Remove and recreate only the assets directory
+    if (fs.existsSync(ASSETS_DIR)) {
+        fs.rmSync(ASSETS_DIR, { recursive: true, force: true });
+    }
     fs.mkdirSync(ASSETS_DIR, { recursive: true });
+    
+    // Remove only YAML files (preserving archive directories)
+    if (fs.existsSync(TMP_DIR)) {
+        const files = fs.readdirSync(TMP_DIR);
+        files.forEach(file => {
+            const filePath = path.join(TMP_DIR, file);
+            const stat = fs.statSync(filePath);
+            if (stat.isFile() && file.endsWith('.yml')) {
+                fs.unlinkSync(filePath);
+            }
+        });
+    }
 }
 
 function copySourceFiles() {

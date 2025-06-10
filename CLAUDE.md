@@ -20,7 +20,7 @@ This is an MCP (Model Context Protocol) server that provides tools for working w
 - `npm test` - Run full test suite
 
 **Accuracy Measurement:**
-- `./test/run-accuracy-test.sh` - Run comprehensive accuracy measurement on norminette test files
+- `./test/run-accuracy-test.sh` - Run comprehensive accuracy measurement on norminette test files (automatically rotates old logs)
 - `node test/accuracy-measurement.js` - Direct execution of accuracy measurement script
 
 **Note:** Test suite includes comprehensive clang-format integration testing and norminette rule engine testing.
@@ -704,6 +704,29 @@ This project includes comprehensive accuracy measurement tools to evaluate the e
 
 # Or run the Node.js script directly
 node test/accuracy-measurement.js
+```
+
+### Log Rotation Feature
+
+The accuracy test script automatically rotates old log files to preserve historical results:
+
+- **Automatic Rotation**: Each run of `./test/run-accuracy-test.sh` moves existing `.yml` files to timestamped archive directories
+- **Archive Location**: Old logs are stored in `tmp/archive_YYYYMMDD_HHMMSS/` directories
+- **Preserved Files**: All previous test results are retained for comparison and analysis
+- **Archive Contents**: Each archive contains `before.yml`, `after.yml`, `summary.yml`, and `file_results.yml`
+
+**Example archive structure:**
+```
+tmp/
+├── archive_20250610_220503/     # Previous test run
+│   ├── before.yml
+│   ├── after.yml
+│   ├── summary.yml
+│   └── file_results.yml
+├── before.yml                   # Current test results
+├── after.yml
+├── summary.yml
+└── file_results.yml
 ```
 
 ### What the Accuracy Measurement Does
