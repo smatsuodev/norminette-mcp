@@ -137,8 +137,7 @@ export {
   generateClangFormatConfigString,
   checkClangFormatAvailability,
   applyClangFormat,
-  applyClangFormatWithFallback,
-  fixAllWhitespaceIssues
+  applyClangFormatWithFallback
 } from "./clang-format.js";
 export { NorminetteFormatter } from "./norminette-formatter.js";
 export { defaultFormattingRules } from "./formatting-rules.js";

@@ -3,8 +3,7 @@ import {
   checkClangFormatAvailability,
   applyClangFormat,
   applyClangFormatWithFallback,
-  generateClangFormatConfigString,
-  fixAllWhitespaceIssues
+  generateClangFormatConfigString
 } from '../dist/index.js';
 
 describe('clang-format Integration System', () => {
@@ -87,36 +86,6 @@ return 0;
     });
   });
 
-  describe('Fallback Function', () => {
-    it('should handle basic whitespace fixes as fallback', () => {
-      const input = `int  main(void)   
-{
-    int  x   =   5;   
-
-    return (0);  
-}`;
-      
-      const result = fixAllWhitespaceIssues(input);
-      
-      // Basic improvements should be made
-      assert(!result.includes('   \n')); // No trailing spaces
-      assert(!result.includes('  x   =')); // Reduced consecutive spaces
-      assert(result.includes('\tint x = 5;')); // Leading spaces to tabs
-      
-      console.log('  Fallback function working correctly');
-    });
-
-    it('should handle empty lines correctly', () => {
-      const input = `code
-   
-more code`;
-      
-      const result = fixAllWhitespaceIssues(input);
-      
-      assert(result.includes('code\n\nmore code'));
-      assert(!result.includes('   \n'));
-    });
-  });
 
   describe('Complex Code Formatting', () => {
     it('should handle function declarations correctly', async function() {

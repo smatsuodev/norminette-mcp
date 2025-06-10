@@ -84,21 +84,13 @@ export async function applyClangFormat(content: string): Promise<string> {
   }
 }
 
-export function fixAllWhitespaceIssues(content: string): string {
-  return content
-    .replace(/[ \t]+$/gm, '')
-    .replace(/^[ \t]+$/gm, '')
-    .replace(/^    /gm, '\t')
-    .replace(/  +/g, ' ');
-}
 
 export async function applyClangFormatWithFallback(content: string): Promise<{ formatted: string; usedClangFormat: boolean }> {
   try {
     const formatted = await applyClangFormat(content);
     return { formatted, usedClangFormat: true };
   } catch (error) {
-    console.warn('clang-format failed, falling back to regex-based fixes:', error instanceof Error ? error.message : String(error));
-    const fallbackFormatted = fixAllWhitespaceIssues(content);
-    return { formatted: fallbackFormatted, usedClangFormat: false };
+    console.warn('clang-format failed, no fallback available:', error instanceof Error ? error.message : String(error));
+    return { formatted: content, usedClangFormat: false };
   }
 }
