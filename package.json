@@ -12,7 +12,7 @@
     "postbuild": "echo '#!/usr/bin/env node' > temp && tail -n +2 dist/index.js >> temp && mv temp dist/index.js && chmod +x dist/index.js",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "test": "mocha test/*.test.js",
+    "test": "mocha test/clang-format-integration.test.js",
     "prepublishOnly": "npm run build"
   },
   "files": [

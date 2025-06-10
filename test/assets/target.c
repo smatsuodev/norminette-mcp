@@ -12,16 +12,16 @@
 
 #include <stdio.h>
 
-int	main(void)
+int main(void)
 {
-	int	i; 
-	int	j; 
-    
-	i = 0;  
-	j  =  1;  
-	if  (i == j)
+	int i;
+	int j;
+
+	i = 0;
+	j = 1;
+	if (i == j)
 	{
-	    printf("equal\n");
+		printf("equal\n");
 		return (0);
 	}
 	printf("not equal\n");

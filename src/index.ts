@@ -248,11 +248,15 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
   const originalContent = content;
   const fixes: string[] = [];
 
-  // Apply comprehensive whitespace fixes that preserve comments
-  const fixedContent = fixAllWhitespaceIssues(content);
-  if (fixedContent !== content) {
-    content = fixedContent;
-    fixes.push("Fixed whitespace issues while preserving comments");
+  // Apply clang-format with fallback to preserve existing functionality
+  const formatResult = await applyClangFormatWithFallback(content);
+  if (formatResult.formatted !== content) {
+    content = formatResult.formatted;
+    if (formatResult.usedClangFormat) {
+      fixes.push("Applied clang-format for 42 School compliance");
+    } else {
+      fixes.push("Applied fallback whitespace fixes");
+    }
   }
 
   if (content !== originalContent) {
@@ -264,402 +268,271 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
   }
 }
 
-// Comprehensive whitespace fix function that handles multi-line comments correctly
+// Simple fallback function for when clang-format is not available
 function fixAllWhitespaceIssues(content: string): string {
-  // First, identify and mark all comment and string regions
-  const segments = parseCodeSegments(content);
-  
-  let result = '';
-  
-  for (const segment of segments) {
-    if (segment.type === 'comment' || segment.type === 'string') {
-      // Preserve comments and strings exactly as they are
-      result += segment.content;
-    } else {
-      // Apply fixes to code segments
-      result += fixCodeSegment(segment.content);
-    }
-  }
-  
-  return result;
+  return content
+    .replace(/[ \t]+$/gm, '') // Remove trailing whitespace
+    .replace(/^[ \t]+$/gm, '') // Remove whitespace on empty lines
+    .replace(/^    /gm, '\t') // Convert 4 spaces to tabs at line start
+    .replace(/  +/g, ' '); // Fix consecutive spaces (basic fallback)
 }
 
-interface CodeSegment {
-  type: 'code' | 'comment' | 'string';
-  content: string;
+// ===== HYBRID APPROACH: CLANG-FORMAT INTEGRATION =====
+
+interface ClangFormatConfig {
+  BasedOnStyle: string;
+  IndentWidth: number;
+  UseTab: string;
+  TabWidth: number;
+  ColumnLimit: number;
+  AllowShortFunctionsOnASingleLine: string;
+  AllowShortIfStatementsOnASingleLine: string;
+  AllowShortLoopsOnASingleLine: boolean;
+  BraceWrapping: {
+    AfterFunction: boolean;
+    AfterControlStatement: string;
+    AfterStruct: boolean;
+    AfterEnum: boolean;
+    AfterUnion: boolean;
+  };
+  BreakBeforeBraces: string;
+  SpaceAfterCStyleCast: boolean;
+  SpaceBeforeParens: string;
+  SpacesInParentheses: boolean;
+  SpacesInSquareBrackets: boolean;
+  AlignConsecutiveDeclarations: boolean;
+  AlignConsecutiveAssignments: boolean;
 }
 
-function parseCodeSegments(content: string): CodeSegment[] {
-  const segments: CodeSegment[] = [];
-  let i = 0;
-  
-  while (i < content.length) {
-    // Check for line comment
-    if (i < content.length - 1 && content[i] === '/' && content[i + 1] === '/') {
-      const start = i;
-      // Find end of line
-      while (i < content.length && content[i] !== '\n') {
-        i++;
-      }
-      if (i < content.length) i++; // Include the newline
-      segments.push({ type: 'comment', content: content.substring(start, i) });
-      continue;
-    }
-    
-    // Check for block comment
-    if (i < content.length - 1 && content[i] === '/' && content[i + 1] === '*') {
-      const start = i;
-      i += 2;
-      // Find end of block comment
-      while (i < content.length - 1) {
-        if (content[i] === '*' && content[i + 1] === '/') {
-          i += 2;
-          break;
-        }
-        i++;
-      }
-      // If we didn't find closing */, include rest of content
-      if (i >= content.length - 1 && !(content[i - 1] === '/' && content[i - 2] === '*')) {
-        i = content.length;
-      }
-      segments.push({ type: 'comment', content: content.substring(start, i) });
-      continue;
-    }
-    
-    // Check for string literal
-    if (content[i] === '"' || content[i] === "'") {
-      const quote = content[i];
-      const start = i;
-      i++;
-      
-      // Find end of string, handling escape sequences
-      while (i < content.length) {
-        if (content[i] === '\\') {
-          i += 2; // Skip escaped character
-          continue;
-        }
-        if (content[i] === quote) {
-          i++;
-          break;
-        }
-        i++;
-      }
-      segments.push({ type: 'string', content: content.substring(start, i) });
-      continue;
-    }
-    
-    // Regular code - find next special character
-    const start = i;
-    while (i < content.length) {
-      if ((i < content.length - 1 && content[i] === '/' && (content[i + 1] === '/' || content[i + 1] === '*')) ||
-          content[i] === '"' || content[i] === "'") {
-        break;
-      }
-      i++;
-    }
-    
-    if (i > start) {
-      segments.push({ type: 'code', content: content.substring(start, i) });
-    }
-  }
-  
-  return segments;
+function generate42SchoolClangFormatConfig(): ClangFormatConfig {
+  return {
+    BasedOnStyle: "LLVM",
+    IndentWidth: 4,
+    UseTab: "ForIndentation", // Use tabs for indentation, spaces for alignment
+    TabWidth: 4,
+    ColumnLimit: 80, // 42 School rule: max 80 characters per line
+    AllowShortFunctionsOnASingleLine: "None", // Functions must be on multiple lines
+    AllowShortIfStatementsOnASingleLine: "Never", // Control structures on multiple lines
+    AllowShortLoopsOnASingleLine: false,
+    BraceWrapping: {
+      AfterFunction: true, // Opening brace on new line for functions
+      AfterControlStatement: "Always", // Opening brace on new line for control statements
+      AfterStruct: true,
+      AfterEnum: true,
+      AfterUnion: true
+    },
+    BreakBeforeBraces: "Custom",
+    SpaceAfterCStyleCast: false, // No space after cast: (int)value
+    SpaceBeforeParens: "ControlStatements", // Space before parentheses in control statements
+    SpacesInParentheses: false, // No spaces inside parentheses
+    SpacesInSquareBrackets: false, // No spaces inside square brackets
+    AlignConsecutiveDeclarations: false, // Don't align variable declarations
+    AlignConsecutiveAssignments: false // Don't align assignments
+  };
 }
 
-function fixCodeSegment(content: string): string {
-  const lines = content.split('\n');
-  
-  return lines.map(line => {
-    // Remove trailing spaces and tabs
-    line = line.replace(/[ \t]+$/, '');
-    
-    // Handle empty lines (remove any whitespace)
-    if (line.trim() === '') {
-      return '';
-    }
-    
-    // Convert leading spaces to tabs (4 spaces = 1 tab)
-    const leadingWhitespace = line.match(/^[ \t]*/);
-    if (leadingWhitespace) {
-      const leading = leadingWhitespace[0];
-      let leadingPart = '';
-      
-      // Convert mixed/space indentation to tabs
-      if (leading.length > 0) {
-        const totalSpaces = leading.split('').reduce((count, char) => {
-          return count + (char === '\t' ? 4 : 1);
-        }, 0);
-        const tabCount = Math.floor(totalSpaces / 4);
-        const remainingSpaces = totalSpaces % 4;
-        leadingPart = '\t'.repeat(tabCount) + ' '.repeat(remainingSpaces);
-      }
-      
-      // Get the non-leading part
-      let restPart = line.substring(leading.length);
-      
-      // Only convert tabs to spaces around operators and punctuation, not before identifiers
-      // Keep tabs between types/keywords and identifiers
-      restPart = restPart.replace(/\t(?=[ \t]*[+\-*/%=<>!&|,;(){}\[\]."])/g, ' ');
-      
-      // Fix consecutive spaces (2 or more spaces become 1 space), but preserve single tabs
-      restPart = restPart.replace(/  +/g, ' ');
-      
-      return leadingPart + restPart;
-    }
-    
-    return line;
-  }).join('\n');
+function generateClangFormatConfigString(): string {
+  const config = generate42SchoolClangFormatConfig();
+  const yamlConfig = yaml.dump(config, { indent: 2 });
+  return yamlConfig;
 }
 
-// SPC_BEFORE_NL: Remove trailing spaces
-function fixTrailingSpaces(content: string): string {
-  return content.replace(/[ \t]+$/gm, '');
-}
-
-// SPACE_EMPTY_LINE: Remove spaces on empty lines
-function fixSpaceOnEmptyLines(content: string): string {
-  return content.replace(/^[ \t]+$/gm, '');
-}
-
-// SPC_INSTEAD_TAB: Convert leading spaces to tabs
-function fixLeadingSpaces(content: string): string {
-  const lines = content.split('\n');
-  return lines.map(line => {
-    // Count leading spaces and convert groups of 4 spaces to tabs
-    const leadingSpaces = line.match(/^( +)/);
-    if (leadingSpaces) {
-      const spaceCount = leadingSpaces[1].length;
-      const tabCount = Math.floor(spaceCount / 4);
-      const remainingSpaces = spaceCount % 4;
-      const tabs = '\t'.repeat(tabCount);
-      const spaces = ' '.repeat(remainingSpaces);
-      return tabs + spaces + line.substring(spaceCount);
-    }
-    return line;
-  }).join('\n');
-}
-
-// TAB_INSTEAD_SPC: Convert tabs to spaces where needed (not at line start)
-function fixTabsToSpaces(content: string): string {
-  const lines = content.split('\n');
-  return lines.map(line => {
-    // Skip empty lines
-    if (line.trim() === '') return line;
-    
-    // Find the end of leading whitespace
-    const leadingWhitespace = line.match(/^[\t ]*/);
-    const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
-    
-    // Process the non-leading part while preserving comments and strings
-    const leadingPart = line.substring(0, leadingLength);
-    const restPart = line.substring(leadingLength);
-    
-    // Use helper function to preserve whitespace in comments and strings
-    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
-      // Convert all tabs to spaces in non-leading positions (except in comments/strings)
-      return segment.replace(/\t/g, ' ');
+async function checkClangFormatAvailability(): Promise<boolean> {
+  try {
+    execSync('clang-format --version', { 
+      encoding: 'utf-8', 
+      timeout: 5000,
+      stdio: 'pipe' // Suppress output
     });
-    
-    return leadingPart + transformedRest;
-  }).join('\n');
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
-// CONSECUTIVE_SPC: Fix consecutive spaces (except at line start)
-function fixConsecutiveSpaces(content: string): string {
-  const lines = content.split('\n');
-  return lines.map(line => {
-    // Skip empty lines
-    if (line.trim() === '') return line;
-    
-    // Find the end of leading whitespace (tabs and spaces at start)
-    const leadingWhitespace = line.match(/^[\t ]*/);
-    const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
-    
-    // Fix consecutive spaces in the non-leading part while preserving comments
-    const leadingPart = line.substring(0, leadingLength);
-    const restPart = line.substring(leadingLength);
-    
-    // Use helper function to preserve whitespace in comments and strings
-    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
-      // Replace consecutive spaces with single space
-      return segment.replace(/ {2,}/g, ' ');
-    });
-    
-    return leadingPart + transformedRest;
-  }).join('\n');
-}
+async function applyClangFormat(content: string): Promise<string> {
+  const isAvailable = await checkClangFormatAvailability();
+  if (!isAvailable) {
+    throw new Error('clang-format is not available on this system');
+  }
 
-// CONSECUTIVE_WS: Fix consecutive whitespace characters
-function fixConsecutiveWhitespace(content: string): string {
-  const lines = content.split('\n');
-  return lines.map(line => {
-    // Skip empty lines
-    if (line.trim() === '') return line;
+  try {
+    const configString = generateClangFormatConfigString();
     
-    // Find the end of leading whitespace
-    const leadingWhitespace = line.match(/^[\t ]*/);
-    const leadingLength = leadingWhitespace ? leadingWhitespace[0].length : 0;
+    // Create temporary config file
+    const tempConfigPath = path.join(process.cwd(), '.clang-format-temp');
+    fs.writeFileSync(tempConfigPath, configString);
     
-    // Fix consecutive whitespace in the non-leading part while preserving comments
-    const leadingPart = line.substring(0, leadingLength);
-    const restPart = line.substring(leadingLength);
-    
-    // Use helper function to preserve whitespace in comments and strings
-    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
-      return segment.replace(/[ \t]{2,}/g, match => {
-        // If it's all spaces, reduce to one space
-        if (match.match(/^ +$/)) return ' ';
-        // If it's all tabs, reduce to one tab
-        if (match.match(/^\t+$/)) return '\t';
-        // If mixed, convert to single space
-        return ' ';
+    try {
+      // Apply clang-format with the custom config using --style=file
+      const formatted = execSync(`clang-format --style=file:.clang-format-temp`, {
+        input: content,
+        encoding: 'utf-8',
+        timeout: 10000,
+        cwd: process.cwd()
       });
-    });
-    
-    return leadingPart + transformedRest;
-  }).join('\n');
-}
-
-// MIXED_SPACE_TAB: Fix mixed spaces and tabs
-function fixMixedSpacesAndTabs(content: string): string {
-  const lines = content.split('\n');
-  return lines.map(line => {
-    // Skip empty lines
-    if (line.trim() === '') return line;
-    
-    // Check for mixed spaces and tabs in leading whitespace
-    const leadingWhitespace = line.match(/^[\t ]*/);
-    let leadingPart = '';
-    let restPart = line;
-    
-    if (leadingWhitespace) {
-      const leading = leadingWhitespace[0];
-      const leadingLength = leading.length;
       
-      // If there are mixed spaces and tabs in leading whitespace
-      if (leading.includes(' ') && leading.includes('\t')) {
-        // Convert all to tabs (groups of 4 spaces = 1 tab)
-        const totalSpaces = leading.split('').reduce((count, char) => {
-          return count + (char === '\t' ? 4 : 1);
-        }, 0);
-        const tabCount = Math.floor(totalSpaces / 4);
-        const remainingSpaces = totalSpaces % 4;
-        leadingPart = '\t'.repeat(tabCount) + ' '.repeat(remainingSpaces);
-        restPart = line.substring(leadingLength);
-      } else {
-        // No mixed leading whitespace, keep as is
-        leadingPart = leading;
-        restPart = line.substring(leadingLength);
+      return formatted;
+    } finally {
+      // Clean up temporary config file
+      if (fs.existsSync(tempConfigPath)) {
+        fs.unlinkSync(tempConfigPath);
       }
     }
-    
-    // Use helper function to preserve whitespace in comments and strings
-    const transformedRest = preserveWhitespaceInComments(restPart, (segment) => {
-      // Convert all tabs to spaces in non-leading positions (except in comments/strings)
-      return segment.replace(/\t/g, ' ');
-    });
-    
-    return leadingPart + transformedRest;
-  }).join('\n');
-}
-
-
-// Helper function to preserve whitespace in comments
-function preserveWhitespaceInComments(text: string, transform: (text: string) => string): string {
-  // Track comment state
-  let result = '';
-  let i = 0;
-  
-  while (i < text.length) {
-    // Check for start of line comment
-    if (i < text.length - 1 && text[i] === '/' && text[i + 1] === '/') {
-      // Line comment - preserve everything after //
-      result += text.substring(i);
-      break;
-    }
-    
-    // Check for start of block comment
-    if (i < text.length - 1 && text[i] === '/' && text[i + 1] === '*') {
-      // Find end of block comment
-      const commentStart = i;
-      i += 2;
-      while (i < text.length - 1) {
-        if (text[i] === '*' && text[i + 1] === '/') {
-          i += 2;
-          break;
-        }
-        i++;
-      }
-      // If we didn't find closing */, treat rest of line as comment
-      if (i >= text.length - 1 && !(text[i - 1] === '/' && text[i - 2] === '*')) {
-        i = text.length;
-      }
-      
-      // Preserve the entire comment as-is
-      result += text.substring(commentStart, i);
-      continue;
-    }
-    
-    // Check if we're inside a string literal
-    if (text[i] === '"' || text[i] === "'") {
-      const quote = text[i];
-      const stringStart = i;
-      i++;
-      
-      // Find end of string, handling escape sequences
-      while (i < text.length) {
-        if (text[i] === '\\') {
-          i += 2; // Skip escaped character
-          continue;
-        }
-        if (text[i] === quote) {
-          i++;
-          break;
-        }
-        i++;
-      }
-      
-      // Preserve the entire string as-is
-      result += text.substring(stringStart, i);
-      continue;
-    }
-    
-    // Not in comment or string - find next comment or string start
-    let nextSpecial = text.length;
-    
-    // Look for next comment or string
-    for (let j = i; j < text.length - 1; j++) {
-      if ((text[j] === '/' && (text[j + 1] === '/' || text[j + 1] === '*')) ||
-          text[j] === '"' || text[j] === "'") {
-        nextSpecial = j;
-        break;
-      }
-    }
-    
-    // Transform the non-comment, non-string part
-    const segment = text.substring(i, nextSpecial);
-    result += transform(segment);
-    i = nextSpecial;
+  } catch (error: any) {
+    throw new Error(`clang-format failed: ${error.message}`);
   }
-  
-  return result;
 }
 
-// Export fix functions for testing
+async function applyClangFormatWithFallback(content: string): Promise<{ formatted: string; usedClangFormat: boolean }> {
+  try {
+    const formatted = await applyClangFormat(content);
+    return { formatted, usedClangFormat: true };
+  } catch (error) {
+    // Fallback to existing regex-based fixes
+    console.warn('clang-format failed, falling back to regex-based fixes:', error instanceof Error ? error.message : String(error));
+    const fallbackFormatted = fixAllWhitespaceIssues(content);
+    return { formatted: fallbackFormatted, usedClangFormat: false };
+  }
+}
+
+// ===== ERROR CATEGORIZATION SYSTEM =====
+
+interface ErrorCategory {
+  whitespace_and_formatting: string[];
+  norminette_specific: string[];
+  unfixable: string[];
+}
+
+function categorizeNorminetteErrors(): ErrorCategory {
+  return {
+    // Errors that clang-format can help fix
+    whitespace_and_formatting: [
+      'SPC_INSTEAD_TAB',
+      'TAB_INSTEAD_SPC', 
+      'CONSECUTIVE_SPC',
+      'CONSECUTIVE_WS',
+      'SPACE_EMPTY_LINE',
+      'SPC_BEFORE_NL',
+      'MIXED_SPACE_TAB',
+      'EMPTY_LINE_FILE_START',
+      'EMPTY_LINE_EOF',
+      'CONSECUTIVE_NEWLINES',
+      'TOO_FEW_TAB',
+      'TOO_MANY_TAB',
+      'TOO_MANY_WS',
+      'SPC_BFR_OPERATOR',
+      'SPC_AFTER_OPERATOR',
+      'NO_SPC_BFR_OPR',
+      'NO_SPC_AFR_OPR',
+      'SPC_AFTER_PAR',
+      'SPC_BFR_PAR',
+      'NO_SPC_AFR_PAR',
+      'NO_SPC_BFR_PAR'
+    ],
+    
+    // Errors that need norminette-specific rule engine
+    norminette_specific: [
+      'SPACE_BEFORE_FUNC',
+      'SPACE_REPLACE_TAB',
+      'SPC_AFTER_POINTER',
+      'SPC_BFR_POINTER',
+      'TAB_REPLACE_SPACE',
+      'MISSING_TAB_FUNC',
+      'MISSING_TAB_VAR',
+      'TOO_MANY_TABS_FUNC',
+      'TOO_MANY_TABS_TD',
+      'MISSING_TAB_TYPDEF',
+      'TOO_MANY_TAB_VAR',
+      'NO_TAB_BF_TYPEDEF',
+      'BRACE_SHOULD_EOL',
+      'NEWLINE_PRECEDES_FUNC',
+      'NL_AFTER_VAR_DECL',
+      'NL_AFTER_PREPROC',
+      'EMPTY_LINE_FUNCTION',
+      'BRACE_NEWLINE',
+      'EXP_NEWLINE',
+      'NEWLINE_IN_DECL',
+      'PREPROC_BAD_INDENT',
+      'EXP_PARENTHESIS',
+      'EXP_SEMI_COLON',
+      'EXP_TAB',
+      'MISALIGNED_VAR_DECL',
+      'MISALIGNED_FUNC_DECL',
+      'COMMA_START_LINE',
+      'EOL_OPERATOR',
+      'PREPROC_NO_SPACE',
+      'INCLUDE_MISSING_SP',
+      'PREPROC_EXPECTED_EOL',
+      'PREPROC_START_LINE',
+      'SPACE_AFTER_KW',
+      'RETURN_PARENTHESIS',
+      'NO_ARGS_VOID',
+      'LINE_TOO_LONG',
+      'MISSING_IDENTIFIER',
+      'ATTR_EOL',
+      'SPC_LINE_START'
+    ],
+    
+    // Errors that cannot be automatically fixed
+    unfixable: [
+      'TOO_MANY_LINES',
+      'TOO_MANY_FUNCS',
+      'TOO_MANY_VARS_FUNC',
+      'TOO_MANY_ARGS',
+      'WRONG_SCOPE_VAR',
+      'VAR_DECL_START_FUNC',
+      'FORBIDDEN_CS',
+      'ASSIGN_IN_CONTROL',
+      'VLA_FORBIDDEN',
+      'FORBIDDEN_CHAR_NAME',
+      'USER_DEFINED_TYPEDEF',
+      'STRUCT_TYPE_NAMING',
+      'ENUM_TYPE_NAMING',
+      'UNION_TYPE_NAMING',
+      'GLOBAL_VAR_NAMING',
+      'MACRO_NAME_CAPITAL',
+      'MULT_ASSIGN_LINE',
+      'MULT_DECL_LINE',
+      'DECL_ASSIGN_LINE',
+      'MACRO_FUNC_FORBIDDEN',
+      'TERNARY_FBIDDEN',
+      'LABEL_FBIDDEN',
+      'GOTO_FBIDDEN',
+      'TOO_MANY_INSTR',
+      'INVALID_HEADER'
+    ]
+  };
+}
+
+function getErrorCategory(errorCode: string): 'whitespace_and_formatting' | 'norminette_specific' | 'unfixable' {
+  const categories = categorizeNorminetteErrors();
+  
+  if (categories.whitespace_and_formatting.includes(errorCode)) {
+    return 'whitespace_and_formatting';
+  }
+  if (categories.norminette_specific.includes(errorCode)) {
+    return 'norminette_specific';
+  }
+  return 'unfixable';
+}
+
+// Export functions for testing and external use
 export { 
-  fixTrailingSpaces, 
-  fixSpaceOnEmptyLines, 
-  fixLeadingSpaces, 
-  fixTabsToSpaces, 
-  fixConsecutiveSpaces, 
-  fixConsecutiveWhitespace, 
-  fixMixedSpacesAndTabs,
-  preserveWhitespaceInComments,
-  fixAllWhitespaceIssues,
-  parseCodeSegments,
-  fixCodeSegment,
+  // Core norminette functionality
   fixNorminetteErrors,
-  runNorminette
+  runNorminette,
+  // clang-format integration
+  generate42SchoolClangFormatConfig,
+  generateClangFormatConfigString,
+  checkClangFormatAvailability,
+  applyClangFormat,
+  applyClangFormatWithFallback,
+  // Error categorization system
+  categorizeNorminetteErrors,
+  getErrorCategory,
+  // Simple fallback function
+  fixAllWhitespaceIssues
 };
 
 async function main() {
