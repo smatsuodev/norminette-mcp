@@ -30,14 +30,16 @@ function generateHeaderLines(header: Header42): string[] {
   // Line 3: Title decoration
   lines.push('/*                                                        :::      ::::::::   */');
   
-  // Line 4: Filename line
-  const filenamePadded = header.filename.padEnd(51);
+  // Line 4: Filename line (80 chars total)
+  // Truncate filename if too long to fit in 51 chars
+  const filename = header.filename.length > 51 ? header.filename.substring(0, 51) : header.filename;
+  const filenamePadded = filename.padEnd(51);
   lines.push(`/*   ${filenamePadded}:+:      :+:    :+:   */`);
   
   // Line 5: Empty decoration line
   lines.push('/*                                                    +:+ +:+         +:+     */');
   
-  // Line 6: Author line
+  // Line 6: Author line (80 chars total)
   const authorInfo = `${header.username} <${header.email}>`;
   const authorPadded = authorInfo.padEnd(43);
   lines.push(`/*   By: ${authorPadded}+#+  +:+       +#+        */`);
@@ -45,14 +47,14 @@ function generateHeaderLines(header: Header42): string[] {
   // Line 7: Empty decoration line
   lines.push('/*                                                +#+#+#+#+#+   +#+           */');
   
-  // Line 8: Created line
+  // Line 8: Created line (80 chars total)
   const createdInfo = `${header.createdDate} by ${header.createdBy}`;
-  const createdPadded = createdInfo.padEnd(39);
+  const createdPadded = createdInfo.padEnd(41);
   lines.push(`/*   Created: ${createdPadded}#+#    #+#             */`);
   
-  // Line 9: Updated line
+  // Line 9: Updated line (80 chars total)
   const updatedInfo = `${header.updatedDate} by ${header.updatedBy}`;
-  const updatedPadded = updatedInfo.padEnd(37);
+  const updatedPadded = updatedInfo.padEnd(39);
   lines.push(`/*   Updated: ${updatedPadded} ###   ########.fr       */`);
   
   // Line 10: Empty line
@@ -125,8 +127,8 @@ export function has42Header(content: string): boolean {
     2: /\s+:::      ::::::::   \*\/$/,
     3: /^\/\*   .{51}:\+:      :\+:    :\+:   \*\/$/,
     5: /^\/\*   By: .{43}\+#\+  \+:\+       \+#\+        \*\/$/,
-    7: /^\/\*   Created: .{39}#\+#    #\+#             \*\/$/,
-    8: /^\/\*   Updated: .{37} ###   ########\.fr       \*\/$/,
+    7: /^\/\*   Created: .{41}#\+#    #\+#             \*\/$/,
+    8: /^\/\*   Updated: .{39} ###   ########\.fr       \*\/$/,
   };
   
   for (const [lineNum, pattern] of Object.entries(patterns)) {

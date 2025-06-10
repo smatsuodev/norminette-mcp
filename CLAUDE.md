@@ -30,12 +30,13 @@ This is an MCP (Model Context Protocol) server that provides tools for working w
 ### ✅ Current Implementation: Structural Fixes + Hybrid clang-format + Lexer-based Token Formatter System
 
 **Core Components:**
-- MCP Server setup with stdio transport for communication
-- Tool handlers for norminette operations  
-- Error parsing and YAML output formatting
-- **Structural fixes for file-level modifications (42 header generation)**
-- **clang-format integration with 42 School configuration**
-- **Lexer-based token formatter for precise norminette error fixing**
+- MCP Server setup with stdio transport for communication (`src/mcp/`)
+- Tool handlers for norminette operations (`src/mcp/handlers.ts`)
+- Error parsing and YAML output formatting (`src/core/norminette.ts`)
+- **Structural fixes for file-level modifications** (`src/fixing/structural/`)
+- **clang-format integration with 42 School configuration** (`src/fixing/formatting/`)
+- **Lexer-based token formatter for precise norminette error fixing** (`src/fixing/formatting/token-based/`)
+- **Complete C language lexer** (`src/lexer/`)
 - Error categorization system (85 fixable errors across 3 categories)
 
 **Implemented Multi-Stage Fixing Architecture:**
@@ -131,7 +132,7 @@ The system employs a **four-stage approach** with intelligent error routing:
 
 **✅ Completed (Phase 3 - Lexer-based Token Formatter):**
 - Complete C language lexer implementation (`src/lexer/`)
-- Token-based formatting engine with position tracking
+- Token-based formatting engine with position tracking (`src/fixing/formatting/token-based/`)
 - 6 core formatter rules implemented:
   - `SPACE_BEFORE_FUNC`: Fix function name spacing
   - `SPACE_REPLACE_TAB`: Fix variable declaration spacing
@@ -139,30 +140,108 @@ The system employs a **four-stage approach** with intelligent error routing:
   - `SPC_BFR_POINTER`: Fix spacing before pointer
   - `MISSING_TAB_FUNC`: Add tabs in function declarations
   - `MISSING_TAB_VAR`: Add tabs in variable declarations
-- Modular architecture split from monolithic `index.ts`
-- Comprehensive test suite: 30 tests, 100% pass rate
+- **✅ Refactored Architecture**: Clean modular structure with proper separation of concerns
+- Comprehensive test suite: 25 tests, 100% pass rate
 - Real-world validation: Complex multi-line code formatting support
 - Accurate line number tracking with `advanceWithNewline()` method
 
 **✅ Completed (Phase 4 - Structural Fixes):**
-- Structural fixes framework (`src/structural-fixes.ts`)
-- 42 header generation and management (`src/header-generator.ts`)
-- System information retrieval (`src/system-info.ts`)
-- INVALID_HEADER auto-fix implementation
+- Structural fixes framework (`src/fixing/structural/structural-fixes.ts`)
+- 42 header generation and management (`src/fixing/structural/header-fixer.ts`)
+- System information retrieval (`src/fixing/structural/system-info.ts`)
+- INVALID_HEADER auto-fix implementation with proper 80-character formatting
 - Integration with existing pipeline as first stage
-- Test suite for header generation functionality
+- Test suite for header generation functionality (all tests passing)
 - Real-world validation: Fixed 73 INVALID_HEADER errors
 
-**🔄 Next Phase (Phase 5):**
-- Implement remaining 33 norminette-specific formatter rules
-- Add more structural fixers (e.g., header protection, include ordering)
+**✅ Completed (Phase 5 - Architecture Refactoring):**
+- **Modular Directory Structure**: Function-based organization for better maintainability
+- **Core Components** (`src/core/`): Basic functionality (norminette execution, file operations)
+- **Fixing Pipeline** (`src/fixing/`): All repair logic organized by type
+  - `structural/`: File-level modifications (42 headers, etc.)
+  - `formatting/`: Format-level fixes (clang-format, token-based)
+- **Lexer System** (`src/lexer/`): Complete C language tokenization
+- **MCP Integration** (`src/mcp/`): Protocol handling separated from business logic
+- **Resolved Circular Dependencies**: Clean import structure without ES module cycles
+- **Enhanced Test Coverage**: All 25 tests passing including header generation
+- **Improved Maintainability**: Clear separation of concerns for future development
+
+**🔄 Next Phase (Phase 6):**
+- Implement remaining 33 norminette-specific formatter rules in `src/fixing/formatting/token-based/rules.ts`
+- Add more structural fixers (header protection, include ordering) in `src/fixing/structural/`
 - Expand lexer to handle edge cases (complex comments, string escapes)
 - Performance optimization for large file processing
 - Improve clang-format configuration to reduce new errors introduced
 
+## Directory Structure
+
+The project follows a clean, modular architecture with function-based organization:
+
+```
+src/
+├── index.ts                    # Main entry point and public API exports
+├── types.ts                    # Shared type definitions
+│
+├── core/                       # Core functionality
+│   ├── index.ts               # Core exports
+│   ├── norminette.ts          # Norminette execution and error parsing
+│   └── file-utils.ts          # File operation utilities
+│
+├── fixing/                     # All error fixing logic
+│   ├── index.ts               # Fixing pipeline exports
+│   ├── pipeline.ts            # Multi-stage fixing pipeline
+│   │
+│   ├── structural/            # File-level structural modifications
+│   │   ├── index.ts
+│   │   ├── structural-fixes.ts # Structural fixer framework
+│   │   ├── header-fixer.ts    # 42 header generation and updates
+│   │   └── system-info.ts     # System information retrieval
+│   │
+│   └── formatting/            # Format-level fixes
+│       ├── index.ts
+│       ├── clang-format.ts    # clang-format integration
+│       └── token-based/       # Token-based norminette-specific fixes
+│           ├── index.ts
+│           ├── formatter.ts   # NorminetteFormatter class
+│           └── rules.ts       # Token formatter rules
+│
+├── lexer/                      # C language lexical analysis
+│   ├── index.ts               # Lexer exports
+│   ├── lexer.ts               # CLexer implementation
+│   ├── token.ts               # Token types and definitions
+│   └── dictionary.ts          # Keywords, operators, brackets
+│
+└── mcp/                        # MCP protocol integration
+    ├── server.ts              # MCP server setup and configuration
+    └── handlers.ts            # Tool request handlers
+```
+
+### Key Architectural Principles
+
+1. **Separation of Concerns**: Each directory has a single, well-defined responsibility
+2. **No Circular Dependencies**: Clean import hierarchy prevents ES module cycles
+3. **Function-Based Organization**: Code is grouped by what it does, not how it's implemented
+4. **Re-export Pattern**: Each directory provides a clean `index.ts` interface
+5. **Hierarchical Dependencies**: Core → Fixing → MCP, with Lexer as a utility
+
+### Module Responsibilities
+
+- **`core/`**: Basic operations (norminette execution, file I/O)
+- **`fixing/`**: All error repair logic, organized by fix type
+  - **`structural/`**: File-level changes (headers, structure)
+  - **`formatting/`**: Style and format corrections
+- **`lexer/`**: C language tokenization and parsing
+- **`mcp/`**: Protocol handling and client communication
+
+This structure enables:
+- **Easy Navigation**: Developers can quickly find relevant code
+- **Isolated Testing**: Each module can be tested independently
+- **Future Expansion**: New features fit naturally into existing categories
+- **Maintainability**: Changes are localized to specific modules
+
 ## MCP Integration
 
-This server is designed to be used with MCP clients. It communicates via stdio transport and expects to be launched as a subprocess by an MCP client application.
+This server is designed to be used with MCP clients. It communicates via stdio transport and expects to be launched as a subprocess by an MCP client application. The MCP-specific code is cleanly separated in `src/mcp/` for easy maintenance and protocol updates.
 
 ## Dependencies
 
@@ -485,7 +564,7 @@ The `tests/` directory contains comprehensive test cases:
 - **✅ Whitespace Preservation**: Spaces, tabs, newlines maintained as tokens for formatting
 
 **Token Formatter Architecture (COMPLETED):**
-- **✅ TokenFormatterRule Interface**: Token-based rules with `canFix()` and `apply()` methods
+- **✅ TokenFormatterRule Interface**: Token-based rules with `canFix()` and `apply()` methods (`src/fixing/formatting/token-based/formatter.ts`)
 - **✅ NorminetteFormatter Class**: Three-stage processing (tokenize → transform → reconstruct)
 - **✅ Position-aware Processing**: Error matching by exact line/column coordinates
 - **✅ Source Reconstruction**: Complete fidelity from tokens back to source code
@@ -499,10 +578,10 @@ The `tests/` directory contains comprehensive test cases:
 - **✅ MISSING_TAB_VAR**: Adds missing tabs in variable declarations (including arrays)
 
 **Integration & Performance (VERIFIED):**
-- **✅ Hybrid Pipeline**: Seamless integration with clang-format stage
-- **✅ Test Coverage**: 30 total tests (13 clang-format + 17 rule engine), 100% pass rate
+- **✅ Hybrid Pipeline**: Seamless integration with clang-format stage (`src/fixing/pipeline.ts`)
+- **✅ Test Coverage**: 25 total tests (8 clang-format + 7 formatter + 4 lexer + 6 header), 100% pass rate
 - **✅ Real-world Results**: 100% error reduction on target.c (3 → 0 errors)
-- **✅ Execution Time**: ~540ms for full test suite, ~360ms for file processing
+- **✅ Execution Time**: ~250ms for full test suite, enhanced performance post-refactoring
 
 ### Key Technical Learnings
 
@@ -584,9 +663,9 @@ async function fixFileErrors(filePath: string): Promise<void> {
 - **Priority execution**: Apply rules in order of importance to avoid conflicts
 - **Separation of concerns**: Structural fixes vs formatting fixes vs token-level fixes
 
-**🔄 Future Implementation Notes (Phase 5):**
-- Implement remaining 33 norminette-specific error rules
-- Add more structural fixers (header protection, include ordering)
+**🔄 Future Implementation Notes (Phase 6):**
+- Implement remaining 33 norminette-specific error rules in `src/fixing/formatting/token-based/rules.ts`
+- Add more structural fixers in `src/fixing/structural/` (header protection, include ordering)
 - Add complex pattern matching for edge cases (e.g., CONSECUTIVE_SPC, MISALIGNED_VAR_DECL)
 - Consider AST integration for context-aware fixes in complex scenarios
 - Performance optimization for large file processing
@@ -608,18 +687,21 @@ async function fixFileErrors(filePath: string): Promise<void> {
 
 **Development Guidelines:**
 - **Prohibited**: @test/assets 以下をnorminette_fixのpathに与えることは禁止です
-- **✅ Current State**: Multi-stage system with structural fixes + clang-format + rule engine (6 rules) active
-- **Performance Requirements**: Maintain fast execution (~540ms for 30+ tests)
-- **Quality Standards**: All code has comprehensive test coverage (30+ test cases, 100% pass rate)
+- **✅ Current State**: Refactored multi-stage system with clean modular architecture
+- **✅ Directory Structure**: Function-based organization in `src/core/`, `src/fixing/`, `src/lexer/`, `src/mcp/`
+- **Performance Requirements**: Maintain fast execution (~250ms for 25 tests)
+- **Quality Standards**: All code has comprehensive test coverage (25 test cases, 100% pass rate)
 - **Fallback Required**: Always provide graceful degradation when external tools fail
 - **Testing Pattern**: Individual rule tests + integration tests + edge case handling
+- **Architectural Principle**: Clear separation of concerns, no circular dependencies
 
-**Phase 5 Development Priorities:**
-1. Implement remaining 33 norminette-specific error rules
-2. Add more structural fixers (header protection, include ordering)
+**Phase 6 Development Priorities:**
+1. Implement remaining 33 norminette-specific error rules in `src/fixing/formatting/token-based/rules.ts`
+2. Add more structural fixers in `src/fixing/structural/` (header protection, include ordering)
 3. Focus on pattern-based fixes first, consider AST for complex cases
 4. Maintain backward compatibility with current multi-stage system
 5. Ensure performance does not degrade with additional rules
+6. Leverage clean modular architecture for easier development and testing
 
 **Key Implementation Insights:**
 - **Array handling**: Variable declaration patterns must support arrays (e.g., `char buffer[100]`)

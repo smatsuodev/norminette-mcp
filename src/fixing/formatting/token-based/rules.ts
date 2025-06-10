@@ -1,6 +1,6 @@
-import { TokenFormatterRule } from "./norminette-formatter.js";
-import { NorminetteError } from "./types.js";
-import { Token, TokenType } from "./lexer/token.js";
+import { TokenFormatterRule } from "./formatter.js";
+import { NorminetteError } from "../../../types.js";
+import { Token, TokenType } from "../../../lexer/token.js";
 
 // SPACE_REPLACE_TAB: Convert spaces to tabs in variable declarations
 export const spaceReplaceTabRule: TokenFormatterRule = {

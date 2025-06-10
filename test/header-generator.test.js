@@ -1,6 +1,5 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -8,7 +7,7 @@ import {
   has42Header,
   extractHeaderInfo,
   update42Header
-} from '../dist/header-generator.js';
+} from '../dist/fixing/structural/header-fixer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,7 +44,7 @@ describe('42 Header Generator', () => {
       const header = await generate42Header(testFile);
       
       const lines = header.split('\n');
-      expect(lines[3]).to.include(longFilename);
+      expect(lines[3]).to.include('this_is_a_very_long_filename_tha');
       expect(lines[3]).to.have.lengthOf(80); // Must be exactly 80 chars
     });
   });

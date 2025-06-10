@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { NorminetteError, NorminetteResult } from "./types.js";
+import { NorminetteError, NorminetteResult } from "../types.js";
 
 export async function runNorminette(targetPath: string): Promise<NorminetteResult> {
   try {

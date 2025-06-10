@@ -1,11 +1,11 @@
 import * as fs from "fs";
-import { runNorminette } from "./norminette.js";
-import { applyClangFormatWithFallback } from "./clang-format.js";
-import { NorminetteFormatter } from "./norminette-formatter.js";
-import { defaultFormattingRules } from "./formatting-rules.js";
-import { getAllCFiles } from "./file-utils.js";
-import { FixResult } from "./types.js";
-import { applyStructuralFixes } from "./structural-fixes.js";
+import { runNorminette } from "../core/norminette.js";
+import { applyClangFormatWithFallback } from "./formatting/clang-format.js";
+import { NorminetteFormatter } from "./formatting/token-based/formatter.js";
+import { defaultFormattingRules } from "./formatting/token-based/rules.js";
+import { getAllCFiles } from "../core/file-utils.js";
+import { FixResult } from "../types.js";
+import { applyStructuralFixes } from "./structural/structural-fixes.js";
 
 const formatter = new NorminetteFormatter();
 

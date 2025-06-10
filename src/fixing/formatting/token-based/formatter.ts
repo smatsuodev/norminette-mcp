@@ -1,6 +1,6 @@
-import { NorminetteError } from "./types.js";
-import { CLexer } from "./lexer/lexer.js";
-import { Token, TokenType } from "./lexer/token.js";
+import { NorminetteError } from "../../../types.js";
+import { CLexer } from "../../../lexer/lexer.js";
+import { Token, TokenType } from "../../../lexer/token.js";
 
 export interface TokenFormatterRule {
   name: string;

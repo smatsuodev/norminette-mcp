@@ -1,5 +1,5 @@
-import { NorminetteError } from './types.js';
-import { generate42Header, has42Header, update42Header } from './header-generator.js';
+import { NorminetteError } from '../../types.js';
+import { generate42Header, has42Header, update42Header } from './header-fixer.js';
 
 /**
  * Interface for structural fixers that modify file structure/content
