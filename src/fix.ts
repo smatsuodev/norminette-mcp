@@ -56,6 +56,8 @@ async function fixFileErrors(filePath: string, fixResults: FixResult): Promise<v
   }
 
   // Stage 2: Apply norminette-specific formatter
+  // Write intermediate content to get accurate norminette errors
+  fs.writeFileSync(filePath, content);
   const errors = await runNorminette(filePath);
   if (errors.errors.length > 0) {
     const formattedContent = formatter.format(content, errors.errors);

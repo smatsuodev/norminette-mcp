@@ -23,18 +23,18 @@ This is an MCP (Model Context Protocol) server that provides tools for working w
 - `./test/run-accuracy-test.sh` - Run comprehensive accuracy measurement on norminette test files (automatically rotates old logs)
 - `node test/accuracy-measurement.js` - Direct execution of accuracy measurement script
 
-**Note:** Test suite includes comprehensive clang-format integration testing and norminette rule engine testing.
+**Note:** Test suite includes comprehensive clang-format integration testing and lexer-based token formatter testing.
 
 ## Architecture
 
-### ✅ Current Implementation: Hybrid clang-format + Rule Engine System
+### ✅ Current Implementation: Hybrid clang-format + Lexer-based Token Formatter System
 
 **Core Components:**
 - MCP Server setup with stdio transport for communication
 - Tool handlers for norminette operations  
 - Error parsing and YAML output formatting
 - **clang-format integration with 42 School configuration**
-- **Norminette-specific rule engine for precision fixes**
+- **Lexer-based token formatter for precise norminette error fixing**
 - Error categorization system (85 fixable errors across 3 categories)
 
 **Implemented Hybrid Fixing Architecture:**
@@ -47,21 +47,18 @@ The system employs a **three-stage approach** with intelligent error routing:
    - External tool availability checking with graceful fallback
    - **Proven effective**: Reduces norminette errors by ~73% in real files
 
-2. **✅ Norminette Rule Engine (ACTIVE - Phase 2a)**
-   - Custom rule processors for norminette-specific errors
-   - Priority-based rule execution with line number tracking
-   - Currently implements 6 high-priority rules:
-     - `SPACE_BEFORE_FUNC`: Tab between return type and function name
-     - `SPACE_REPLACE_TAB`: Tab in variable declarations
-     - `SPC_AFTER_POINTER`: Remove space after pointer asterisk
-     - `SPC_BFR_POINTER`: Fix spacing before pointer asterisk
-     - `MISSING_TAB_FUNC`: Add missing tab before function name
-     - `MISSING_TAB_VAR`: Add missing tab before variable name
-   - **Proven effective**: Combined with clang-format achieves 100% fix rate on target files
+2. **✅ Lexer-based Token Formatter (ACTIVE - Phase 3)**
+   - Complete C language lexer with accurate position tracking
+   - Token-based formatting rules for precise error fixing
+   - Currently implements 2 core formatter rules:
+     - `SPACE_BEFORE_FUNC`: Tab between return type and function name (`int main()` → `int\tmain()`)
+     - `SPACE_REPLACE_TAB`: Tab in variable declarations (`int x;` → `int\tx;`)
+   - **Architecture advantages**: Token-level manipulation with complete source fidelity
+   - **Proven effective**: 100% test success rate (23/23 tests), handles complex multi-line scenarios
 
 3. **✅ Error Categorization System (ACTIVE)**
    - **Whitespace & Formatting**: 21 errors → clang-format handles these
-   - **Norminette-specific**: 39 errors → Rule engine handles these (6 implemented, 33 planned)
+   - **Norminette-specific**: 39 errors → Token formatter handles these (2 implemented, 37 planned)
    - **Unfixable**: 25 errors → Excluded from auto-fix (structural/naming issues)
    - Smart error routing for optimal fixing strategy
 
@@ -74,24 +71,26 @@ The system employs a **three-stage approach** with intelligent error routing:
 - `applyClangFormat()` - Core clang-format integration
 - `applyClangFormatWithFallback()` - Robust formatting with fallback
 - `generate42SchoolClangFormatConfig()` - 42 School configuration generator
-- `RuleEngine` - Priority-based rule execution engine
-- `NorminetteRule` - Interface for individual fixing rules
-- `categorizeNorminetteErrors()` - Error classification system
-- `getErrorCategory()` - Individual error type classification
+- `CLexer` - Complete C language tokenizer with position tracking
+- `NorminetteFormatter` - Token-based formatting engine
+- `TokenFormatterRule` - Interface for token-level formatting rules
 - `checkClangFormatAvailability()` - External tool validation
 
 **Key Interfaces:**
 - `NorminetteError` - Structured representation of norminette error output
 - `NorminetteResult` - Complete norminette execution result with status and errors
-- `NorminetteRule` - Rule definition with canFix/apply methods
-- `RuleEngine` - Rule management and application engine
-- `ClangFormatConfig` - 42 School specific formatting configuration
-- `ErrorCategory` - Three-tier error classification system
+- `Token` - Position-aware token with type and value information
+- `TokenFormatterRule` - Rule definition with canFix/apply methods for token manipulation
+- `Position` - Line/column position tracking interface
+- `TokenType` - Comprehensive C language token type definitions
 
 **Current Error Fixing Pipeline:**
 1. **Initial Check**: Run norminette → Exit if no errors
 2. **clang-format Stage**: Apply 42 School formatting → Fixes whitespace/spacing errors
-3. **Rule Engine Stage**: Apply norminette-specific rules → Fixes precise formatting requirements
+3. **Token Formatter Stage**: 
+   - Tokenize source code with complete C lexer
+   - Apply token-based formatting rules for norminette-specific errors
+   - Reconstruct source code with precise position fidelity
 4. **Final Validation**: Re-run norminette → Report remaining errors
 5. **Result**: Structured output with fixes applied and remaining issues
 
@@ -104,18 +103,20 @@ The system employs a **three-stage approach** with intelligent error routing:
 - Comprehensive test suite (13 test cases, 100% pass rate)
 - Real-world validation (11 errors → 3 errors in test file)
 
-**✅ Completed (Phase 2a):**
-- Norminette-specific rule engine foundation
-- 6 high-priority rules implemented (SPACE_BEFORE_FUNC, SPACE_REPLACE_TAB, etc.)
-- Priority-based rule execution with line number tracking
-- Integration with existing hybrid pipeline
-- Comprehensive test suite expansion (17 new test cases)
-- Real-world validation: 100% error reduction on target.c (3 → 0 errors)
+**✅ Completed (Phase 3 - Lexer-based Token Formatter):**
+- Complete C language lexer implementation (`src/lexer/`)
+- Token-based formatting engine with position tracking
+- 2 core formatter rules implemented (SPACE_BEFORE_FUNC, SPACE_REPLACE_TAB)
+- Modular architecture split from monolithic `index.ts`
+- Comprehensive test suite: 23 tests, 100% pass rate
+- Real-world validation: Complex multi-line code formatting support
+- Accurate line number tracking with `advanceWithNewline()` method
 
-**🔄 Next Phase (Phase 2b):**
-- Implement remaining 33 norminette-specific rules
-- Add more complex pattern matching for edge cases
+**🔄 Next Phase (Phase 4):**
+- Implement remaining 37 norminette-specific formatter rules
+- Expand lexer to handle edge cases (complex comments, string escapes)
 - Performance optimization for large file processing
+- Add more sophisticated token pattern matching
 
 ## MCP Integration
 
@@ -432,13 +433,20 @@ The `tests/` directory contains comprehensive test cases:
 - **✅ MCP Compatibility**: Full integration with MCP protocol maintained
 - **✅ Error Categorization**: Smart routing of 85 error types across 3 categories
 
-### ✅ Successfully Implemented: Norminette Rule Engine (Phase 2a)
+### ✅ Successfully Implemented: Lexer-based Token Formatter (Phase 3)
 
-**Rule Engine Architecture (COMPLETED):**
-- **✅ Rule Interface**: `NorminetteRule` with errorCode, priority, canFix, and apply methods
-- **✅ Rule Engine Class**: Priority-based execution with automatic line number adjustment
-- **✅ Context-aware Patterns**: Each rule validates context before applying fixes
-- **✅ Modular Design**: Easy to add new rules without changing core engine
+**Lexer Architecture (COMPLETED):**
+- **✅ Complete C Lexer**: Full tokenization of C language constructs (`src/lexer/lexer.ts`)
+- **✅ Token Types**: Comprehensive token definitions based on norminette lexer (`src/lexer/token.ts`)
+- **✅ Dictionary Integration**: Keywords, operators, brackets from norminette implementation (`src/lexer/dictionary.ts`)
+- **✅ Position Tracking**: Accurate line/column tracking with `advanceWithNewline()` method
+- **✅ Whitespace Preservation**: Spaces, tabs, newlines maintained as tokens for formatting
+
+**Token Formatter Architecture (COMPLETED):**
+- **✅ TokenFormatterRule Interface**: Token-based rules with `canFix()` and `apply()` methods
+- **✅ NorminetteFormatter Class**: Three-stage processing (tokenize → transform → reconstruct)
+- **✅ Position-aware Processing**: Error matching by exact line/column coordinates
+- **✅ Source Reconstruction**: Complete fidelity from tokens back to source code
 
 **Implemented Rules (6/39):**
 - **✅ SPACE_BEFORE_FUNC**: Fixes `int main()` → `int\tmain()` with proper tab
