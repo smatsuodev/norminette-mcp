@@ -3,10 +3,7 @@ import {
   checkClangFormatAvailability,
   applyClangFormat,
   applyClangFormatWithFallback,
-  generate42SchoolClangFormatConfig,
   generateClangFormatConfigString,
-  categorizeNorminetteErrors,
-  getErrorCategory,
   fixAllWhitespaceIssues
 } from '../dist/index.js';
 
@@ -21,62 +18,18 @@ describe('clang-format Integration System', () => {
   });
 
   describe('42 School Configuration Generation', () => {
-    it('should generate valid 42 School clang-format config', () => {
-      const config = generate42SchoolClangFormatConfig();
-      
-      // Verify key 42 School requirements
-      assert.equal(config.UseTab, 'ForIndentation');
-      assert.equal(config.TabWidth, 4);
-      assert.equal(config.ColumnLimit, 80);
-      assert.equal(config.AllowShortFunctionsOnASingleLine, 'None');
-      assert.equal(config.BraceWrapping.AfterFunction, true);
-      assert.equal(config.BreakBeforeBraces, 'Custom');
-    });
-
     it('should generate valid YAML config string', () => {
       const configString = generateClangFormatConfigString();
       
       assert(typeof configString === 'string');
-      assert(configString.includes('BasedOnStyle: LLVM'));
-      assert(configString.includes('UseTab: ForIndentation'));
-      assert(configString.includes('ColumnLimit: 80'));
+      assert(configString.includes('Language: Cpp'));
+      assert(configString.includes('UseTab: ForContinuationAndIndentation'));
+      assert(configString.includes('ColumnLimit: 1024'));
       assert(configString.includes('TabWidth: 4'));
+      assert(!configString.includes('---'));
     });
   });
 
-  describe('Error Categorization System', () => {
-    it('should categorize errors correctly', () => {
-      const categories = categorizeNorminetteErrors();
-      
-      // Verify category structure
-      assert(Array.isArray(categories.whitespace_and_formatting));
-      assert(Array.isArray(categories.norminette_specific));
-      assert(Array.isArray(categories.unfixable));
-      
-      // Verify expected counts (based on implementation)
-      assert.equal(categories.whitespace_and_formatting.length, 21);
-      assert.equal(categories.norminette_specific.length, 39);
-      assert.equal(categories.unfixable.length, 25);
-    });
-
-    it('should categorize specific error codes correctly', () => {
-      // Test whitespace errors
-      assert.equal(getErrorCategory('SPC_INSTEAD_TAB'), 'whitespace_and_formatting');
-      assert.equal(getErrorCategory('TAB_INSTEAD_SPC'), 'whitespace_and_formatting');
-      assert.equal(getErrorCategory('CONSECUTIVE_SPC'), 'whitespace_and_formatting');
-      assert.equal(getErrorCategory('SPC_BEFORE_NL'), 'whitespace_and_formatting');
-      
-      // Test norminette-specific errors
-      assert.equal(getErrorCategory('MISSING_TAB_FUNC'), 'norminette_specific');
-      assert.equal(getErrorCategory('SPC_AFTER_POINTER'), 'norminette_specific');
-      assert.equal(getErrorCategory('BRACE_SHOULD_EOL'), 'norminette_specific');
-      
-      // Test unfixable errors
-      assert.equal(getErrorCategory('TOO_MANY_LINES'), 'unfixable');
-      assert.equal(getErrorCategory('FORBIDDEN_CHAR_NAME'), 'unfixable');
-      assert.equal(getErrorCategory('TOO_MANY_FUNCS'), 'unfixable');
-    });
-  });
 
   describe('clang-format Application', () => {
     const testCode = `#include <stdio.h>

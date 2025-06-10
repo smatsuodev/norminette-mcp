@@ -170,10 +170,8 @@ function parseNorminetteOutput(output: string, targetPath: string): NorminetteRe
     } else if (line.includes(': Error!')) {
       filesChecked++;
     } else if (line.startsWith('Error: ')) {
-      // Parse error lines like: "Error: INVALID_HEADER       (line:   1, col:   1):	Missing or invalid 42 header"
       const match = line.match(/^Error:\s+(\w+)\s+\(line:\s*(\d+),\s*col:\s*(\d+)\):\s*(.+)$/);
       if (match) {
-        // Get the current file from previous lines
         let currentFile = targetPath;
         for (let i = lines.indexOf(line) - 1; i >= 0; i--) {
           if (lines[i].includes(': Error!') || lines[i].includes(': OK!')) {
@@ -248,7 +246,6 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
   const originalContent = content;
   const fixes: string[] = [];
 
-  // Stage 1: Apply clang-format with fallback
   const formatResult = await applyClangFormatWithFallback(content);
   if (formatResult.formatted !== content) {
     content = formatResult.formatted;
@@ -256,21 +253,6 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
       fixes.push("Applied clang-format for 42 School compliance");
     } else {
       fixes.push("Applied fallback whitespace fixes");
-    }
-  }
-
-  // Stage 2: Apply norminette-specific rules if needed
-  const postFormatErrors = await runNorminette(filePath);
-  if (postFormatErrors.errors.length > 0) {
-    // Filter errors for this specific file
-    const fileErrors = postFormatErrors.errors.filter(e => e.file === filePath);
-    
-    if (fileErrors.length > 0) {
-      const ruleFixedContent = ruleEngine.applyRules(content, fileErrors);
-      if (ruleFixedContent !== content) {
-        content = ruleFixedContent;
-        fixes.push(`Applied norminette-specific rules for ${fileErrors.length} errors`);
-      }
     }
   }
 
@@ -283,73 +265,48 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
   }
 }
 
-// Simple fallback function for when clang-format is not available
 function fixAllWhitespaceIssues(content: string): string {
   return content
-    .replace(/[ \t]+$/gm, '') // Remove trailing whitespace
-    .replace(/^[ \t]+$/gm, '') // Remove whitespace on empty lines
-    .replace(/^    /gm, '\t') // Convert 4 spaces to tabs at line start
-    .replace(/  +/g, ' '); // Fix consecutive spaces (basic fallback)
-}
-
-// ===== HYBRID APPROACH: CLANG-FORMAT INTEGRATION =====
-
-interface ClangFormatConfig {
-  BasedOnStyle: string;
-  IndentWidth: number;
-  UseTab: string;
-  TabWidth: number;
-  ColumnLimit: number;
-  AllowShortFunctionsOnASingleLine: string;
-  AllowShortIfStatementsOnASingleLine: string;
-  AllowShortLoopsOnASingleLine: boolean;
-  BraceWrapping: {
-    AfterFunction: boolean;
-    AfterControlStatement: string;
-    AfterStruct: boolean;
-    AfterEnum: boolean;
-    AfterUnion: boolean;
-  };
-  BreakBeforeBraces: string;
-  SpaceAfterCStyleCast: boolean;
-  SpaceBeforeParens: string;
-  SpacesInParentheses: boolean;
-  SpacesInSquareBrackets: boolean;
-  AlignConsecutiveDeclarations: boolean;
-  AlignConsecutiveAssignments: boolean;
-}
-
-function generate42SchoolClangFormatConfig(): ClangFormatConfig {
-  return {
-    BasedOnStyle: "LLVM",
-    IndentWidth: 4,
-    UseTab: "ForIndentation", // Use tabs for indentation, spaces for alignment
-    TabWidth: 4,
-    ColumnLimit: 80, // 42 School rule: max 80 characters per line
-    AllowShortFunctionsOnASingleLine: "None", // Functions must be on multiple lines
-    AllowShortIfStatementsOnASingleLine: "Never", // Control structures on multiple lines
-    AllowShortLoopsOnASingleLine: false,
-    BraceWrapping: {
-      AfterFunction: true, // Opening brace on new line for functions
-      AfterControlStatement: "Always", // Opening brace on new line for control statements
-      AfterStruct: true,
-      AfterEnum: true,
-      AfterUnion: true
-    },
-    BreakBeforeBraces: "Custom",
-    SpaceAfterCStyleCast: false, // No space after cast: (int)value
-    SpaceBeforeParens: "ControlStatements", // Space before parentheses in control statements
-    SpacesInParentheses: false, // No spaces inside parentheses
-    SpacesInSquareBrackets: false, // No spaces inside square brackets
-    AlignConsecutiveDeclarations: false, // Don't align variable declarations
-    AlignConsecutiveAssignments: false // Don't align assignments
-  };
+    .replace(/[ \t]+$/gm, '')
+    .replace(/^[ \t]+$/gm, '')
+    .replace(/^    /gm, '\t')
+    .replace(/  +/g, ' ');
 }
 
 function generateClangFormatConfigString(): string {
-  const config = generate42SchoolClangFormatConfig();
-  const yamlConfig = yaml.dump(config, { indent: 2 });
-  return yamlConfig;
+  return `Language: Cpp
+TabWidth: 4
+IndentWidth: 4
+UseTab: ForContinuationAndIndentation
+SpaceBeforeParens: ControlStatements
+AllowShortFunctionsOnASingleLine: None
+AlignEscapedNewlines: Left
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeBraces: Allman
+BreakBeforeTernaryOperators: true
+ColumnLimit: 1024
+IncludeBlocks: Merge
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+PointerAlignment: Right
+PenaltyBreakBeforeFirstCallParameter: 1
+PenaltyBreakString: 1
+PenaltyExcessCharacter: 10
+PenaltyReturnTypeOnItsOwnLine: 100
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyParentheses: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+AlignOperands: false
+Cpp11BracedListStyle: true`;
 }
 
 async function checkClangFormatAvailability(): Promise<boolean> {
@@ -357,7 +314,7 @@ async function checkClangFormatAvailability(): Promise<boolean> {
     execSync('clang-format --version', { 
       encoding: 'utf-8', 
       timeout: 5000,
-      stdio: 'pipe' // Suppress output
+      stdio: 'pipe'
     });
     return true;
   } catch (error) {
@@ -374,12 +331,10 @@ async function applyClangFormat(content: string): Promise<string> {
   try {
     const configString = generateClangFormatConfigString();
     
-    // Create temporary config file
     const tempConfigPath = path.join(process.cwd(), '.clang-format-temp');
     fs.writeFileSync(tempConfigPath, configString);
     
     try {
-      // Apply clang-format with the custom config using --style=file
       const formatted = execSync(`clang-format --style=file:.clang-format-temp`, {
         input: content,
         encoding: 'utf-8',
@@ -389,7 +344,6 @@ async function applyClangFormat(content: string): Promise<string> {
       
       return formatted;
     } finally {
-      // Clean up temporary config file
       if (fs.existsSync(tempConfigPath)) {
         fs.unlinkSync(tempConfigPath);
       }
@@ -404,381 +358,30 @@ async function applyClangFormatWithFallback(content: string): Promise<{ formatte
     const formatted = await applyClangFormat(content);
     return { formatted, usedClangFormat: true };
   } catch (error) {
-    // Fallback to existing regex-based fixes
     console.warn('clang-format failed, falling back to regex-based fixes:', error instanceof Error ? error.message : String(error));
     const fallbackFormatted = fixAllWhitespaceIssues(content);
     return { formatted: fallbackFormatted, usedClangFormat: false };
   }
 }
 
-// ===== NORMINETTE RULE ENGINE (PHASE 2) =====
 
-interface NorminetteRule {
-  errorCode: string;
-  priority: number;
-  canFix(error: NorminetteError, context: string): boolean;
-  apply(content: string, error: NorminetteError): string;
-}
-
-class RuleEngine {
-  private rules: Map<string, NorminetteRule> = new Map();
-
-  addRule(rule: NorminetteRule): void {
-    this.rules.set(rule.errorCode, rule);
-  }
-
-  applyRules(content: string, errors: NorminetteError[]): string {
-    // Sort errors by priority and line number
-    const sortedErrors = [...errors].sort((a, b) => {
-      const ruleA = this.rules.get(a.error_code);
-      const ruleB = this.rules.get(b.error_code);
-      const priorityA = ruleA?.priority ?? 999;
-      const priorityB = ruleB?.priority ?? 999;
-      
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-      return a.line - b.line;
-    });
-
-    let fixedContent = content;
-    const appliedFixes: string[] = [];
-
-    for (const error of sortedErrors) {
-      const rule = this.rules.get(error.error_code);
-      if (rule && rule.canFix(error, fixedContent)) {
-        const beforeLines = fixedContent.split('\n').length;
-        fixedContent = rule.apply(fixedContent, error);
-        const afterLines = fixedContent.split('\n').length;
-        
-        // Adjust line numbers for subsequent errors if lines were added/removed
-        const lineDiff = afterLines - beforeLines;
-        if (lineDiff !== 0) {
-          for (const e of sortedErrors) {
-            if (e.line > error.line) {
-              e.line += lineDiff;
-            }
-          }
-        }
-        
-        appliedFixes.push(`Fixed ${error.error_code} at line ${error.line}`);
-      }
-    }
-
-    return fixedContent;
-  }
-
-  getAppliedFixes(): string[] {
-    return [];
-  }
-}
-
-// ===== NORMINETTE-SPECIFIC RULES IMPLEMENTATION =====
-
-// Rule: SPACE_BEFORE_FUNC - Fix space between return type and function name
-const spaceBeforeFuncRule: NorminetteRule = {
-  errorCode: 'SPACE_BEFORE_FUNC',
-  priority: 1,
-  canFix: (error, context) => {
-    const lines = context.split('\n');
-    if (error.line - 1 >= lines.length) return false;
-    const line = lines[error.line - 1];
-    // Check for function declaration pattern: type name(
-    return /^\s*\w+\s+\w+\s*\(/.test(line);
-  },
-  apply: (content, error) => {
-    const lines = content.split('\n');
-    if (error.line - 1 < lines.length) {
-      // Replace space(s) between type and function name with a tab
-      lines[error.line - 1] = lines[error.line - 1].replace(
-        /^(\s*\w+)\s+(\w+\s*\()/,
-        '$1\t$2'
-      );
-    }
-    return lines.join('\n');
-  }
-};
-
-// Rule: SPACE_REPLACE_TAB - Fix spaces that should be tabs (variable declarations)
-const spaceReplaceTabRule: NorminetteRule = {
-  errorCode: 'SPACE_REPLACE_TAB',
-  priority: 2,
-  canFix: (error, context) => {
-    const lines = context.split('\n');
-    if (error.line - 1 >= lines.length) return false;
-    const line = lines[error.line - 1];
-    // Check for variable declaration pattern inside functions
-    return /^\t+\w+\s+\w+/.test(line);
-  },
-  apply: (content, error) => {
-    const lines = content.split('\n');
-    if (error.line - 1 < lines.length) {
-      // Replace spaces between type and variable name with a tab, preserving initial tabs
-      lines[error.line - 1] = lines[error.line - 1].replace(
-        /^(\t+)(\w+)\s+(\w+)/,
-        '$1$2\t$3'
-      );
-    }
-    return lines.join('\n');
-  }
-};
-
-// Rule: SPC_AFTER_POINTER - Remove space after pointer asterisk
-const spcAfterPointerRule: NorminetteRule = {
-  errorCode: 'SPC_AFTER_POINTER',
-  priority: 3,
-  canFix: (error, context) => {
-    const lines = context.split('\n');
-    if (error.line - 1 >= lines.length) return false;
-    const line = lines[error.line - 1];
-    return line.includes('* ');
-  },
-  apply: (content, error) => {
-    const lines = content.split('\n');
-    if (error.line - 1 < lines.length) {
-      // Remove space after * in pointer declarations
-      lines[error.line - 1] = lines[error.line - 1].replace(/\*\s+/g, '*');
-    }
-    return lines.join('\n');
-  }
-};
-
-// Rule: SPC_BFR_POINTER - Fix spacing before pointer asterisk
-const spcBfrPointerRule: NorminetteRule = {
-  errorCode: 'SPC_BFR_POINTER',
-  priority: 4,
-  canFix: (error, context) => {
-    const lines = context.split('\n');
-    if (error.line - 1 >= lines.length) return false;
-    const line = lines[error.line - 1];
-    return /\w\*/.test(line) || /\s{2,}\*/.test(line);
-  },
-  apply: (content, error) => {
-    const lines = content.split('\n');
-    if (error.line - 1 < lines.length) {
-      // Ensure single space before * in pointer declarations
-      lines[error.line - 1] = lines[error.line - 1]
-        .replace(/(\w)\*/g, '$1 *')  // Add space if missing
-        .replace(/\s{2,}\*/g, ' *');  // Fix multiple spaces
-    }
-    return lines.join('\n');
-  }
-};
-
-// Rule: MISSING_TAB_FUNC - Add missing tab before function name
-const missingTabFuncRule: NorminetteRule = {
-  errorCode: 'MISSING_TAB_FUNC',
-  priority: 5,
-  canFix: (error, context) => {
-    const lines = context.split('\n');
-    if (error.line - 1 >= lines.length) return false;
-    const line = lines[error.line - 1];
-    return /^\w+\s*\w+\s*\(/.test(line);
-  },
-  apply: (content, error) => {
-    const lines = content.split('\n');
-    if (error.line - 1 < lines.length) {
-      // Add tab between return type and function name
-      lines[error.line - 1] = lines[error.line - 1].replace(
-        /^(\w+)\s*(\w+\s*\()/,
-        '$1\t$2'
-      );
-    }
-    return lines.join('\n');
-  }
-};
-
-// Rule: MISSING_TAB_VAR - Add missing tab before variable name
-const missingTabVarRule: NorminetteRule = {
-  errorCode: 'MISSING_TAB_VAR',
-  priority: 6,
-  canFix: (error, context) => {
-    const lines = context.split('\n');
-    if (error.line - 1 >= lines.length) return false;
-    const line = lines[error.line - 1];
-    // Match variable declarations with arrays or simple variables
-    return /^\t*\w+\s+\w+(\[.*\])?;/.test(line);
-  },
-  apply: (content, error) => {
-    const lines = content.split('\n');
-    if (error.line - 1 < lines.length) {
-      // Add tab between type and variable name (including array declarations)
-      lines[error.line - 1] = lines[error.line - 1].replace(
-        /^(\t*)(\w+)\s+(\w+(?:\[.*\])?;)/,
-        '$1$2\t$3'
-      );
-    }
-    return lines.join('\n');
-  }
-};
-
-// Initialize rule engine with implemented rules
-const ruleEngine = new RuleEngine();
-ruleEngine.addRule(spaceBeforeFuncRule);
-ruleEngine.addRule(spaceReplaceTabRule);
-ruleEngine.addRule(spcAfterPointerRule);
-ruleEngine.addRule(spcBfrPointerRule);
-ruleEngine.addRule(missingTabFuncRule);
-ruleEngine.addRule(missingTabVarRule);
-
-// ===== ERROR CATEGORIZATION SYSTEM =====
-
-interface ErrorCategory {
-  whitespace_and_formatting: string[];
-  norminette_specific: string[];
-  unfixable: string[];
-}
-
-function categorizeNorminetteErrors(): ErrorCategory {
-  return {
-    // Errors that clang-format can help fix
-    whitespace_and_formatting: [
-      'SPC_INSTEAD_TAB',
-      'TAB_INSTEAD_SPC', 
-      'CONSECUTIVE_SPC',
-      'CONSECUTIVE_WS',
-      'SPACE_EMPTY_LINE',
-      'SPC_BEFORE_NL',
-      'MIXED_SPACE_TAB',
-      'EMPTY_LINE_FILE_START',
-      'EMPTY_LINE_EOF',
-      'CONSECUTIVE_NEWLINES',
-      'TOO_FEW_TAB',
-      'TOO_MANY_TAB',
-      'TOO_MANY_WS',
-      'SPC_BFR_OPERATOR',
-      'SPC_AFTER_OPERATOR',
-      'NO_SPC_BFR_OPR',
-      'NO_SPC_AFR_OPR',
-      'SPC_AFTER_PAR',
-      'SPC_BFR_PAR',
-      'NO_SPC_AFR_PAR',
-      'NO_SPC_BFR_PAR'
-    ],
-    
-    // Errors that need norminette-specific rule engine
-    norminette_specific: [
-      'SPACE_BEFORE_FUNC',
-      'SPACE_REPLACE_TAB',
-      'SPC_AFTER_POINTER',
-      'SPC_BFR_POINTER',
-      'TAB_REPLACE_SPACE',
-      'MISSING_TAB_FUNC',
-      'MISSING_TAB_VAR',
-      'TOO_MANY_TABS_FUNC',
-      'TOO_MANY_TABS_TD',
-      'MISSING_TAB_TYPDEF',
-      'TOO_MANY_TAB_VAR',
-      'NO_TAB_BF_TYPEDEF',
-      'BRACE_SHOULD_EOL',
-      'NEWLINE_PRECEDES_FUNC',
-      'NL_AFTER_VAR_DECL',
-      'NL_AFTER_PREPROC',
-      'EMPTY_LINE_FUNCTION',
-      'BRACE_NEWLINE',
-      'EXP_NEWLINE',
-      'NEWLINE_IN_DECL',
-      'PREPROC_BAD_INDENT',
-      'EXP_PARENTHESIS',
-      'EXP_SEMI_COLON',
-      'EXP_TAB',
-      'MISALIGNED_VAR_DECL',
-      'MISALIGNED_FUNC_DECL',
-      'COMMA_START_LINE',
-      'EOL_OPERATOR',
-      'PREPROC_NO_SPACE',
-      'INCLUDE_MISSING_SP',
-      'PREPROC_EXPECTED_EOL',
-      'PREPROC_START_LINE',
-      'SPACE_AFTER_KW',
-      'RETURN_PARENTHESIS',
-      'NO_ARGS_VOID',
-      'LINE_TOO_LONG',
-      'MISSING_IDENTIFIER',
-      'ATTR_EOL',
-      'SPC_LINE_START'
-    ],
-    
-    // Errors that cannot be automatically fixed
-    unfixable: [
-      'TOO_MANY_LINES',
-      'TOO_MANY_FUNCS',
-      'TOO_MANY_VARS_FUNC',
-      'TOO_MANY_ARGS',
-      'WRONG_SCOPE_VAR',
-      'VAR_DECL_START_FUNC',
-      'FORBIDDEN_CS',
-      'ASSIGN_IN_CONTROL',
-      'VLA_FORBIDDEN',
-      'FORBIDDEN_CHAR_NAME',
-      'USER_DEFINED_TYPEDEF',
-      'STRUCT_TYPE_NAMING',
-      'ENUM_TYPE_NAMING',
-      'UNION_TYPE_NAMING',
-      'GLOBAL_VAR_NAMING',
-      'MACRO_NAME_CAPITAL',
-      'MULT_ASSIGN_LINE',
-      'MULT_DECL_LINE',
-      'DECL_ASSIGN_LINE',
-      'MACRO_FUNC_FORBIDDEN',
-      'TERNARY_FBIDDEN',
-      'LABEL_FBIDDEN',
-      'GOTO_FBIDDEN',
-      'TOO_MANY_INSTR',
-      'INVALID_HEADER'
-    ]
-  };
-}
-
-function getErrorCategory(errorCode: string): 'whitespace_and_formatting' | 'norminette_specific' | 'unfixable' {
-  const categories = categorizeNorminetteErrors();
-  
-  if (categories.whitespace_and_formatting.includes(errorCode)) {
-    return 'whitespace_and_formatting';
-  }
-  if (categories.norminette_specific.includes(errorCode)) {
-    return 'norminette_specific';
-  }
-  return 'unfixable';
-}
-
-// Export functions for testing and external use
 export { 
-  // Core norminette functionality
   fixNorminetteErrors,
   runNorminette,
-  // clang-format integration
-  generate42SchoolClangFormatConfig,
   generateClangFormatConfigString,
   checkClangFormatAvailability,
   applyClangFormat,
   applyClangFormatWithFallback,
-  // Error categorization system
-  categorizeNorminetteErrors,
-  getErrorCategory,
-  // Simple fallback function
-  fixAllWhitespaceIssues,
-  // Rule engine exports
-  RuleEngine,
-  ruleEngine,
-  // Rule implementations for testing
-  spaceBeforeFuncRule,
-  spaceReplaceTabRule,
-  spcAfterPointerRule,
-  spcBfrPointerRule,
-  missingTabFuncRule,
-  missingTabVarRule
+  fixAllWhitespaceIssues
 };
 
-// Export types for testing
-export type { NorminetteRule, NorminetteError, NorminetteResult };
+export type { NorminetteError, NorminetteResult };
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-// Only run the server if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
     process.stderr.write(`Server error: ${error}\n`);
