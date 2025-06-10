@@ -7,7 +7,7 @@ This package provides an MCP server that exposes norminette functionality throug
 ## Features
 
 - **Check code**: Run norminette on files or directories and get structured results
-- **Auto-fix**: Automatically fix common norminette errors (whitespace, indentation, spacing)
+- **Auto-fix**: Automatically fix common norminette errors (whitespace, indentation, spacing, function separation)
 - **MCP integration**: Works with any MCP-compatible client (Claude Desktop, VS Code, etc.)
 
 ## Installation
@@ -31,8 +31,18 @@ norminette-mcp
   ```bash
   pip install norminette
   ```
+- clang-format (recommended for optimal auto-fixing):
+  ```bash
+  # macOS (via Homebrew)
+  brew install clang-format
+  
+  # Ubuntu/Debian
+  sudo apt install clang-format
+  
+  # Other systems: install via package manager or LLVM
+  ```
 
-> **Note**: This MCP server requires the norminette Python package to be installed separately. The norminette tool is not bundled with this npm package.
+> **Note**: This MCP server requires the norminette Python package to be installed separately. The norminette tool is not bundled with this npm package. For optimal auto-fixing capabilities, clang-format is recommended but not required (the system will fallback to basic regex-based fixes if clang-format is unavailable).
 
 ## Usage with MCP Clients
 
@@ -93,6 +103,8 @@ Supported auto-fixes:
 - Consecutive spaces/tabs
 - Space/tab conversion errors
 - Indentation issues
+- Function separation (automatic spacing between functions)
+- Files ending with newline
 
 ## License
 

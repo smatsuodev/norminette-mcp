@@ -16,12 +16,8 @@ This is an MCP (Model Context Protocol) server that provides tools for working w
 - `npm start` - Start the MCP server (requires build first)
 - `npm run dev` - Run the server in development mode with tsx
 
-**Testing & Quality:**
-- `npm test` - Run full test suite (30 test cases: 13 clang-format + 17 rule engine)
-- `npm test test/clang-format-integration.test.js` - Run clang-format tests only
-- `npm test test/rule-engine.test.js` - Run rule engine tests only
-- `npm run lint` - Run TypeScript linting
-- `npm run format` - Format codebase with prettier
+**Testing:**
+- `npm test` - Run full test suite
 
 **Note:** Test suite includes comprehensive clang-format integration testing and norminette rule engine testing.
 

@@ -291,8 +291,6 @@ BreakBeforeBraces: Allman
 BreakBeforeTernaryOperators: true
 ColumnLimit: 1024
 IncludeBlocks: Merge
-KeepEmptyLinesAtTheStartOfBlocks: false
-MaxEmptyLinesToKeep: 1
 PointerAlignment: Right
 PenaltyBreakBeforeFirstCallParameter: 1
 PenaltyBreakString: 1
@@ -306,7 +304,11 @@ SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
 AlignOperands: false
-Cpp11BracedListStyle: true`;
+Cpp11BracedListStyle: true
+SeparateDefinitionBlocks: Always
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+InsertNewlineAtEOF: true`;
 }
 
 async function checkClangFormatAvailability(): Promise<boolean> {
