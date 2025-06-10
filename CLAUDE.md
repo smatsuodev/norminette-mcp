@@ -19,6 +19,10 @@ This is an MCP (Model Context Protocol) server that provides tools for working w
 **Testing:**
 - `npm test` - Run full test suite
 
+**Accuracy Measurement:**
+- `./test/run-accuracy-test.sh` - Run comprehensive accuracy measurement on norminette test files
+- `node test/accuracy-measurement.js` - Direct execution of accuracy measurement script
+
 **Note:** Test suite includes comprehensive clang-format integration testing and norminette rule engine testing.
 
 ## Architecture
@@ -687,3 +691,111 @@ npm publish --dry-run
 2. **Version Management**: Use `npm version` + git tags
 3. **Automated Publishing**: GitHub Actions on tag push
 4. **Manual First Publish**: `npm publish` (subsequent releases automated)
+
+## Accuracy Measurement Tools
+
+This project includes comprehensive accuracy measurement tools to evaluate the effectiveness of the norminette auto-fix functionality.
+
+### Quick Start
+
+```bash
+# Run complete accuracy measurement (recommended)
+./test/run-accuracy-test.sh
+
+# Or run the Node.js script directly
+node test/accuracy-measurement.js
+```
+
+### What the Accuracy Measurement Does
+
+The accuracy measurement script performs a comprehensive evaluation of the norminette auto-fix functionality:
+
+1. **Test File Setup**: Copies all C/H files from `norminette/tests/rules/samples/` (103 files) to `tmp/assets/`
+2. **Initial Assessment**: Runs `norminette_check` to establish baseline error counts
+3. **Auto-Fix Application**: Applies `norminette_fix` to all test files
+4. **Post-Fix Assessment**: Re-runs `norminette_check` to measure improvement
+5. **Detailed Analysis**: Generates comprehensive comparison reports
+
+### Output Files
+
+The measurement generates several output files in the `tmp/` directory:
+
+- **`before.yml`** - Complete norminette results before auto-fix
+- **`after.yml`** - Complete norminette results after auto-fix  
+- **`summary.yml`** - Overall statistics and error analysis
+- **`file_results.yml`** - Detailed file-by-file improvement results
+
+### Summary Report Structure
+
+**`summary.yml` contains:**
+- **`total_files_processed`** - Number of files analyzed
+- **`overall_stats`** - Key metrics:
+  - Total errors before/after
+  - Files improved/degraded/unchanged
+  - Error reduction percentage
+  - New errors introduced count
+- **`remaining_errors`** - Errors sorted by increase amount:
+  - Each error shows current count and increase/decrease from baseline
+  - Positive increase = new errors introduced by auto-fix
+  - Negative increase = errors successfully fixed
+
+**`file_results.yml` contains:**
+- **`file_results`** - Per-file analysis:
+  - Error count before/after
+  - Error delta (positive = degraded, negative = improved)
+  - List of new errors introduced
+  - Improvement status
+
+### Example Results
+
+```yaml
+# summary.yml example
+total_files_processed: 86
+overall_stats:
+  total_errors_before: 754
+  total_errors_after: 1275
+  error_reduction_percentage: '-69.10'
+  files_improved: 16
+  files_degraded: 63
+remaining_errors:
+  - error_code: SPACE_REPLACE_TAB
+    count: 361
+    increase: 341  # 341 new instances introduced
+  - error_code: SPACE_BEFORE_FUNC
+    count: 144
+    increase: 138  # 138 new instances introduced
+```
+
+### Usage for Development
+
+**Evaluating Auto-Fix Improvements:**
+1. Make changes to auto-fix rules or clang-format configuration
+2. Run `./test/run-accuracy-test.sh`
+3. Compare results to previous runs
+4. Focus on errors with highest `increase` values for next improvements
+
+**Identifying Problem Areas:**
+- High positive `increase` values indicate auto-fix is introducing new errors
+- Focus on top errors in `remaining_errors` list for maximum impact
+- Use `file_results.yml` to identify which files are most affected
+
+**Performance Tracking:**
+- Track `error_reduction_percentage` over time
+- Monitor `files_improved` vs `files_degraded` ratio
+- Watch for regression in `new_errors_introduced` count
+
+### Technical Notes
+
+- **Test Coverage**: Uses official 42 School norminette test suite (103 files)
+- **Real-World Validation**: Tests actual problematic C code patterns
+- **Performance**: Full measurement typically completes in under 30 seconds
+- **Reproducible**: Generates fresh copies of test files for each run
+- **ES Module Compatible**: Written in modern JavaScript with ES modules
+
+### Integration with Development Workflow
+
+Run accuracy measurement:
+- **Before releases** - Ensure no regression in auto-fix quality
+- **After rule changes** - Validate improvements in targeted error types
+- **During debugging** - Identify which files trigger specific error patterns
+- **For documentation** - Generate statistics for release notes and README updates
