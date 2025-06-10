@@ -248,7 +248,7 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
   const originalContent = content;
   const fixes: string[] = [];
 
-  // Apply clang-format with fallback to preserve existing functionality
+  // Stage 1: Apply clang-format with fallback
   const formatResult = await applyClangFormatWithFallback(content);
   if (formatResult.formatted !== content) {
     content = formatResult.formatted;
@@ -256,6 +256,21 @@ async function fixFileErrors(filePath: string, fixResults: any): Promise<void> {
       fixes.push("Applied clang-format for 42 School compliance");
     } else {
       fixes.push("Applied fallback whitespace fixes");
+    }
+  }
+
+  // Stage 2: Apply norminette-specific rules if needed
+  const postFormatErrors = await runNorminette(filePath);
+  if (postFormatErrors.errors.length > 0) {
+    // Filter errors for this specific file
+    const fileErrors = postFormatErrors.errors.filter(e => e.file === filePath);
+    
+    if (fileErrors.length > 0) {
+      const ruleFixedContent = ruleEngine.applyRules(content, fileErrors);
+      if (ruleFixedContent !== content) {
+        content = ruleFixedContent;
+        fixes.push(`Applied norminette-specific rules for ${fileErrors.length} errors`);
+      }
     }
   }
 
@@ -396,6 +411,216 @@ async function applyClangFormatWithFallback(content: string): Promise<{ formatte
   }
 }
 
+// ===== NORMINETTE RULE ENGINE (PHASE 2) =====
+
+interface NorminetteRule {
+  errorCode: string;
+  priority: number;
+  canFix(error: NorminetteError, context: string): boolean;
+  apply(content: string, error: NorminetteError): string;
+}
+
+class RuleEngine {
+  private rules: Map<string, NorminetteRule> = new Map();
+
+  addRule(rule: NorminetteRule): void {
+    this.rules.set(rule.errorCode, rule);
+  }
+
+  applyRules(content: string, errors: NorminetteError[]): string {
+    // Sort errors by priority and line number
+    const sortedErrors = [...errors].sort((a, b) => {
+      const ruleA = this.rules.get(a.error_code);
+      const ruleB = this.rules.get(b.error_code);
+      const priorityA = ruleA?.priority ?? 999;
+      const priorityB = ruleB?.priority ?? 999;
+      
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      return a.line - b.line;
+    });
+
+    let fixedContent = content;
+    const appliedFixes: string[] = [];
+
+    for (const error of sortedErrors) {
+      const rule = this.rules.get(error.error_code);
+      if (rule && rule.canFix(error, fixedContent)) {
+        const beforeLines = fixedContent.split('\n').length;
+        fixedContent = rule.apply(fixedContent, error);
+        const afterLines = fixedContent.split('\n').length;
+        
+        // Adjust line numbers for subsequent errors if lines were added/removed
+        const lineDiff = afterLines - beforeLines;
+        if (lineDiff !== 0) {
+          for (const e of sortedErrors) {
+            if (e.line > error.line) {
+              e.line += lineDiff;
+            }
+          }
+        }
+        
+        appliedFixes.push(`Fixed ${error.error_code} at line ${error.line}`);
+      }
+    }
+
+    return fixedContent;
+  }
+
+  getAppliedFixes(): string[] {
+    return [];
+  }
+}
+
+// ===== NORMINETTE-SPECIFIC RULES IMPLEMENTATION =====
+
+// Rule: SPACE_BEFORE_FUNC - Fix space between return type and function name
+const spaceBeforeFuncRule: NorminetteRule = {
+  errorCode: 'SPACE_BEFORE_FUNC',
+  priority: 1,
+  canFix: (error, context) => {
+    const lines = context.split('\n');
+    if (error.line - 1 >= lines.length) return false;
+    const line = lines[error.line - 1];
+    // Check for function declaration pattern: type name(
+    return /^\s*\w+\s+\w+\s*\(/.test(line);
+  },
+  apply: (content, error) => {
+    const lines = content.split('\n');
+    if (error.line - 1 < lines.length) {
+      // Replace space(s) between type and function name with a tab
+      lines[error.line - 1] = lines[error.line - 1].replace(
+        /^(\s*\w+)\s+(\w+\s*\()/,
+        '$1\t$2'
+      );
+    }
+    return lines.join('\n');
+  }
+};
+
+// Rule: SPACE_REPLACE_TAB - Fix spaces that should be tabs (variable declarations)
+const spaceReplaceTabRule: NorminetteRule = {
+  errorCode: 'SPACE_REPLACE_TAB',
+  priority: 2,
+  canFix: (error, context) => {
+    const lines = context.split('\n');
+    if (error.line - 1 >= lines.length) return false;
+    const line = lines[error.line - 1];
+    // Check for variable declaration pattern inside functions
+    return /^\t+\w+\s+\w+/.test(line);
+  },
+  apply: (content, error) => {
+    const lines = content.split('\n');
+    if (error.line - 1 < lines.length) {
+      // Replace spaces between type and variable name with a tab, preserving initial tabs
+      lines[error.line - 1] = lines[error.line - 1].replace(
+        /^(\t+)(\w+)\s+(\w+)/,
+        '$1$2\t$3'
+      );
+    }
+    return lines.join('\n');
+  }
+};
+
+// Rule: SPC_AFTER_POINTER - Remove space after pointer asterisk
+const spcAfterPointerRule: NorminetteRule = {
+  errorCode: 'SPC_AFTER_POINTER',
+  priority: 3,
+  canFix: (error, context) => {
+    const lines = context.split('\n');
+    if (error.line - 1 >= lines.length) return false;
+    const line = lines[error.line - 1];
+    return line.includes('* ');
+  },
+  apply: (content, error) => {
+    const lines = content.split('\n');
+    if (error.line - 1 < lines.length) {
+      // Remove space after * in pointer declarations
+      lines[error.line - 1] = lines[error.line - 1].replace(/\*\s+/g, '*');
+    }
+    return lines.join('\n');
+  }
+};
+
+// Rule: SPC_BFR_POINTER - Fix spacing before pointer asterisk
+const spcBfrPointerRule: NorminetteRule = {
+  errorCode: 'SPC_BFR_POINTER',
+  priority: 4,
+  canFix: (error, context) => {
+    const lines = context.split('\n');
+    if (error.line - 1 >= lines.length) return false;
+    const line = lines[error.line - 1];
+    return /\w\*/.test(line) || /\s{2,}\*/.test(line);
+  },
+  apply: (content, error) => {
+    const lines = content.split('\n');
+    if (error.line - 1 < lines.length) {
+      // Ensure single space before * in pointer declarations
+      lines[error.line - 1] = lines[error.line - 1]
+        .replace(/(\w)\*/g, '$1 *')  // Add space if missing
+        .replace(/\s{2,}\*/g, ' *');  // Fix multiple spaces
+    }
+    return lines.join('\n');
+  }
+};
+
+// Rule: MISSING_TAB_FUNC - Add missing tab before function name
+const missingTabFuncRule: NorminetteRule = {
+  errorCode: 'MISSING_TAB_FUNC',
+  priority: 5,
+  canFix: (error, context) => {
+    const lines = context.split('\n');
+    if (error.line - 1 >= lines.length) return false;
+    const line = lines[error.line - 1];
+    return /^\w+\s*\w+\s*\(/.test(line);
+  },
+  apply: (content, error) => {
+    const lines = content.split('\n');
+    if (error.line - 1 < lines.length) {
+      // Add tab between return type and function name
+      lines[error.line - 1] = lines[error.line - 1].replace(
+        /^(\w+)\s*(\w+\s*\()/,
+        '$1\t$2'
+      );
+    }
+    return lines.join('\n');
+  }
+};
+
+// Rule: MISSING_TAB_VAR - Add missing tab before variable name
+const missingTabVarRule: NorminetteRule = {
+  errorCode: 'MISSING_TAB_VAR',
+  priority: 6,
+  canFix: (error, context) => {
+    const lines = context.split('\n');
+    if (error.line - 1 >= lines.length) return false;
+    const line = lines[error.line - 1];
+    // Match variable declarations with arrays or simple variables
+    return /^\t*\w+\s+\w+(\[.*\])?;/.test(line);
+  },
+  apply: (content, error) => {
+    const lines = content.split('\n');
+    if (error.line - 1 < lines.length) {
+      // Add tab between type and variable name (including array declarations)
+      lines[error.line - 1] = lines[error.line - 1].replace(
+        /^(\t*)(\w+)\s+(\w+(?:\[.*\])?;)/,
+        '$1$2\t$3'
+      );
+    }
+    return lines.join('\n');
+  }
+};
+
+// Initialize rule engine with implemented rules
+const ruleEngine = new RuleEngine();
+ruleEngine.addRule(spaceBeforeFuncRule);
+ruleEngine.addRule(spaceReplaceTabRule);
+ruleEngine.addRule(spcAfterPointerRule);
+ruleEngine.addRule(spcBfrPointerRule);
+ruleEngine.addRule(missingTabFuncRule);
+ruleEngine.addRule(missingTabVarRule);
+
 // ===== ERROR CATEGORIZATION SYSTEM =====
 
 interface ErrorCategory {
@@ -532,8 +757,21 @@ export {
   categorizeNorminetteErrors,
   getErrorCategory,
   // Simple fallback function
-  fixAllWhitespaceIssues
+  fixAllWhitespaceIssues,
+  // Rule engine exports
+  RuleEngine,
+  ruleEngine,
+  // Rule implementations for testing
+  spaceBeforeFuncRule,
+  spaceReplaceTabRule,
+  spcAfterPointerRule,
+  spcBfrPointerRule,
+  missingTabFuncRule,
+  missingTabVarRule
 };
+
+// Export types for testing
+export type { NorminetteRule, NorminetteError, NorminetteResult };
 
 async function main() {
   const transport = new StdioServerTransport();
