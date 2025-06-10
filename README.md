@@ -98,6 +98,7 @@ Check files or directories for norminette compliance.
 Automatically fix common norminette errors in files.
 
 Supported auto-fixes:
+- **42 header auto-generation**: Automatically generates missing or invalid 42 School headers with proper metadata
 - Trailing spaces and tabs
 - Empty lines at start/end of file
 - Consecutive spaces/tabs

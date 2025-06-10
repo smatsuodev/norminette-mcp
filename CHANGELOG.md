@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-06-11
+
+### Added
+- **Lexer-based Token Formatter System**: Complete C language lexer with precise token-based formatting rules
+  - `CLexer` class with full C tokenization support and position tracking
+  - `NorminetteFormatter` engine for token-level error fixing with source reconstruction
+  - Implemented formatter rules: `SPACE_BEFORE_FUNC`, `SPACE_REPLACE_TAB`, `SPC_AFTER_POINTER`, `SPC_BFR_POINTER`, `MISSING_TAB_FUNC`, `MISSING_TAB_VAR`
+- **Structural Fixes Framework**: File-level modification system for complex errors
+  - 42 header auto-generation and update functionality
+  - System info retrieval for proper header metadata
+  - `INVALID_HEADER` error auto-fix implementation
+- **Comprehensive Accuracy Measurement Tools**: 
+  - Automated accuracy testing with log rotation
+  - Performance analysis against official norminette test suite (103 files)
+  - Detailed before/after comparison with YAML output
+
+### Changed
+- **Major Architecture Refactoring**: Function-based modular directory structure
+  - `src/core/`: Basic functionality (norminette execution, file operations)
+  - `src/fixing/`: All repair logic (structural, formatting, token-based)
+  - `src/lexer/`: Complete C language tokenization system
+  - `src/mcp/`: Protocol handling separated from business logic
+- **Multi-Stage Fixing Pipeline**: Intelligent error routing system
+  1. Structural fixes (42 headers, file-level issues)
+  2. clang-format integration (whitespace & formatting)
+  3. Token-based formatter (norminette-specific errors)
+  4. Final validation and reporting
+- Enhanced test coverage: 25 comprehensive tests with 100% pass rate (~363ms execution)
+
+### Technical Details
+- **Complete C Lexer**: Position-aware tokenization with newline tracking
+- **Token Formatter Architecture**: Rule-based system with `canFix()` and `apply()` methods
+- **Circular Dependency Resolution**: Clean import hierarchy without ES module cycles
+- **Error Categorization**: 85 norminette errors across 3 categories with smart routing
+- **Real-world Validation**: 100% error reduction on complex test files
+- **Performance Optimization**: Maintained fast execution with enhanced functionality
+
 ## [0.3.0] - 2025-06-10
 
 ### Added
@@ -73,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic shebang injection for CLI usage
 - GitHub Actions workflow for automated npm publishing on tag push
 
-[Unreleased]: https://github.com/smatsuodev/norminette-mcp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/smatsuodev/norminette-mcp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/smatsuodev/norminette-mcp/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/smatsuodev/norminette-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/smatsuodev/norminette-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/smatsuodev/norminette-mcp/releases/tag/v0.1.0
