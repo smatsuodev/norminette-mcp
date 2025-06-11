@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-06-11
+
+### Fixed
+- Removed conditional execution check in main entry point to ensure server always starts
+- Fixed test import paths to use main index.js exports instead of direct module imports
+
 ## [0.4.0] - 2025-06-11
 
 ### Added
