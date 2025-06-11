@@ -12,9 +12,7 @@ async function main() {
   await startMCPServer();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    process.stderr.write(`Server error: ${error}\n`);
-    process.exit(1);
-  });
-}
+main().catch((error) => {
+  process.stderr.write(`Server error: ${error}\n`);
+  process.exit(1);
+});
